@@ -1,0 +1,48 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <!-- Gold Ring -->
+    <path
+        android:strokeWidth="2"
+        android:strokeColor="#F9C32C"
+        android:pathData="M54,54m-35,0a35,35 0,1 1,70 0a35,35 0,1 1,-70 0" />
+
+    <!-- Church Building (White) -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M35,75 L73,75 L73,55 L54,35 L35,55 Z" />
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M48,75 L60,75 L60,65 Q54,60 48,65 Z" /> <!-- Door -->
+
+    <!-- Cross on Top (Gold) -->
+    <path
+        android:fillColor="#F9C32C"
+        android:pathData="M53,22 L55,22 L55,26 L59,26 L59,28 L55,28 L55,34 L53,34 L53,28 L49,28 L49,26 L53,26 Z" />
+
+    <!-- People (Simplified White Circles) -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M25,75 Q25,65 32,65 Q39,65 39,75 Z" /> <!-- Person 1 -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M75,75 Q75,65 82,65 Q89,65 89,75 Z" /> <!-- Person 2 -->
+
+    <!-- Financial Bars (Simplified Gold) -->
+    <path
+        android:fillColor="#F9C32C"
+        android:pathData="M78,60 L82,60 L82,75 L78,75 Z" />
+    <path
+        android:fillColor="#F9C32C"
+        android:pathData="M84,50 L88,50 L88,75 L84,75 Z" />
+
+    <!-- Teal Arc at bottom -->
+    <path
+        android:strokeWidth="2"
+        android:strokeColor="#00A693"
+        android:pathData="M20,85 Q54,75 88,85" />
+
+</vector>

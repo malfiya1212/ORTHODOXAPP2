@@ -1,0 +1,30 @@
+<resources>
+    <string name="app_name">Tewahedo Finance Manager</string>
+    <string name="welcome_message">Welcome</string>
+    
+    <!-- Navigation -->
+    <string name="nav_dashboard">Dashboard</string>
+    <string name="nav_income">Income</string>
+    <string name="nav_expense">Expenses</string>
+    <string name="nav_reports">Reports</string>
+    <string name="nav_audit">Audit</string>
+
+    <!-- Church Hierarchy -->
+    <string name="synod">Holy Synod</string>
+    <string name="diocese">Diocese</string>
+    <string name="church">Church</string>
+    <string name="member">Member</string>
+
+    <!-- Financial Terms -->
+    <string name="tithe">Tithe</string>
+    <string name="offering">Offering</string>
+    <string name="donation">Donation</string>
+    <string name="total_balance">Total Balance</string>
+    <string name="recent_transactions">Recent Transactions</string>
+    
+    <!-- Actions -->
+    <string name="save">Save</string>
+    <string name="cancel">Cancel</string>
+    <string name="approve">Approve</string>
+    <string name="reject">Reject</string>
+</resources>

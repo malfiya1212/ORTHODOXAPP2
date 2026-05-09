@@ -1,0 +1,34 @@
+<resources>
+    <string name="app_name">ተዋህዶ ፋይናንስ</string>
+    <string name="welcome_message">እንኳን ደህና መጡ</string>
+    
+    <!-- Navigation -->
+    <string name="nav_dashboard">ዳሽቦርድ</string>
+    <string name="nav_income">ገቢ</string>
+    <string name="nav_expense">ወጪ</string>
+    <string name="nav_reports">ሪፖርቶች</string>
+    <string name="nav_audit">ኦዲት</string>
+
+    <!-- Church Hierarchy -->
+    <string name="synod">ቅዱስ ሲኖዶስ</string>
+    <string name="diocese">ሀገረ ስብከት</string>
+    <string name="church">ቤተ ክርስቲያን</string>
+    <string name="member">ምዕመን</string>
+
+    <!-- Financial Terms -->
+    <string name="tithe">አስራት</string>
+    <string name="offering">መባ</string>
+    <string name="donation">ልገሳ</string>
+    <string name="total_balance">ጠቅላላ ቀሪ ሂሳብ</string>
+    <string name="recent_transactions">የቅርብ ጊዜ እንቅስቃሴዎች</string>
+    
+    <!-- Actions -->
+    <string name="save">አስቀምጥ</string>
+    <string name="cancel">ሰርዝ</string>
+    <string name="approve">አጽድቅ</string>
+    <string name="reject">ውድቅ አድርግ</string>
+    <string name="msg_low_funds_warning">ማስጠንቀቂያ፡ የሂሳብዎ መጠን ከ %s ብር በታች ሆኗል።</string>
+    <string name="msg_payment_received">ክፍያ ተቀብለናል</string>
+    <string name="msg_expense_approved">ወጪዎ ተፈቅዷል</string>
+    <string name="msg_expense_rejected">ወጪዎ ውድቅ ተደርጓል</string>
+</resources>
