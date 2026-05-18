@@ -12,6 +12,7 @@ import com.example.orthodoxapp.security.SecurityManager
 object NetworkClient {
     
     private const val BASE_URL = "http://10.0.2.2:5000/api/"
+    private const val EXCHANGE_API_BASE_URL = "https://api.exchangerate-api.com/v4/"
 
     // AUTH INTERCEPTOR: Automatically attaches JWT to all requests
     private val authInterceptor = okhttp3.Interceptor { chain ->
@@ -38,5 +39,13 @@ object NetworkClient {
             .addConverterFactory(GsonConverterFactory.create())
             .build()
             .create(ApiService::class.java)
+    }
+
+    val exchangeRateApiService: ExchangeRateApiService by lazy {
+        Retrofit.Builder()
+            .baseUrl(EXCHANGE_API_BASE_URL)
+            .addConverterFactory(GsonConverterFactory.create())
+            .build()
+            .create(ExchangeRateApiService::class.java)
     }
 }

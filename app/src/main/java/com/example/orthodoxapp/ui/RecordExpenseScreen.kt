@@ -84,7 +84,11 @@ fun RecordExpenseScreen(viewModel: FinancialViewModel, onBack: () -> Unit) {
                 }
             }
 
-            Text("Expense Details", fontWeight = FontWeight.Bold, fontSize = 18.sp)
+            val currentUser = viewModel.currentUser.value
+            val userChurch = viewModel.churches.value.find { it.id == currentUser?.churchId }
+            val churchName = userChurch?.name ?: "General Parish"
+
+            Text("Expense Details for $churchName", fontWeight = FontWeight.Bold, fontSize = 18.sp)
 
             // Amount
             OutlinedTextField(
@@ -108,10 +112,10 @@ fun RecordExpenseScreen(viewModel: FinancialViewModel, onBack: () -> Unit) {
                 ) {
                     OutlinedTextField(
                         value = selectedCategory,
-                        onValueChange = {},
+                        onValueChange = { _ -> },
                         readOnly = true,
                         trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
-                        modifier = Modifier.fillMaxWidth().menuAnchor(MenuAnchorType.PrimaryNotEditable, enabled = true),
+                        modifier = Modifier.fillMaxWidth().menuAnchor(MenuAnchorType.PrimaryNotEditable),
                         shape = RoundedCornerShape(12.dp),
                         leadingIcon = { Icon(Icons.Default.Category, contentDescription = null, tint = OrthodoxBlue) },
                         colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = OrthodoxBlue)
@@ -134,17 +138,42 @@ fun RecordExpenseScreen(viewModel: FinancialViewModel, onBack: () -> Unit) {
             }
 
             // Date Selection
+            var showDatePicker by remember { mutableStateOf(false) }
+            val datePickerState = rememberDatePickerState(initialSelectedDateMillis = System.currentTimeMillis())
+            val formattedDate = remember(datePickerState.selectedDateMillis) {
+                val millis = datePickerState.selectedDateMillis ?: System.currentTimeMillis()
+                java.text.SimpleDateFormat("dd MMM yyyy", java.util.Locale.getDefault()).format(java.util.Date(millis))
+            }
+
+            if (showDatePicker) {
+                DatePickerDialog(
+                    onDismissRequest = { showDatePicker = false },
+                    confirmButton = {
+                        TextButton(onClick = { showDatePicker = false }) { Text("OK") }
+                    },
+                    dismissButton = {
+                        TextButton(onClick = { showDatePicker = false }) { Text("Cancel") }
+                    }
+                ) {
+                    DatePicker(state = datePickerState)
+                }
+            }
+
             Column {
                 Text("Date", fontWeight = FontWeight.Bold, fontSize = 14.sp, color = TextSecondary)
                 Spacer(Modifier.height(8.dp))
                 OutlinedTextField(
-                    value = "Today's Date",
-                    onValueChange = {},
+                    value = formattedDate,
+                    onValueChange = { _ -> },
                     readOnly = true,
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier.fillMaxWidth().clickable { showDatePicker = true },
+                    enabled = true,
                     shape = RoundedCornerShape(12.dp),
                     leadingIcon = { Icon(Icons.Default.CalendarToday, contentDescription = null, tint = OrthodoxBlue) },
-                    colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = OrthodoxBlue)
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = OrthodoxBlue,
+                        unfocusedBorderColor = OrthodoxBlue
+                    )
                 )
             }
 
@@ -163,34 +192,28 @@ fun RecordExpenseScreen(viewModel: FinancialViewModel, onBack: () -> Unit) {
                 )
             }
 
-            // Receipt Upload Section
-            Surface(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(16.dp),
-                color = SurfaceWhite,
-                shadowElevation = 2.dp
-            ) {
-                Column(
-                    modifier = Modifier.padding(24.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ) {
-                    if (selectedImageUri != null) {
-                        AsyncImage(
-                            model = selectedImageUri,
-                            contentDescription = "Selected Receipt",
-                            modifier = Modifier.size(120.dp).padding(bottom = 8.dp)
-                        )
-                    } else {
-                        Icon(Icons.Default.Description, contentDescription = null, modifier = Modifier.size(48.dp), tint = OrthodoxBlue)
-                    }
-                    Spacer(Modifier.height(12.dp))
-                    Text("Attach Receipt / Invoice", fontWeight = FontWeight.Bold, color = TextPrimary)
-                    Text("Proof of expense is required for approval", fontSize = 12.sp, color = TextSecondary)
-                    Spacer(Modifier.height(16.dp))
-                    OutlinedButton(onClick = { imagePickerLauncher.launch("image/*") }) {
-                        Text(if (selectedImageUri == null) "Choose File" else "Change File")
-                    }
-                }
+            val generatedRef = remember { "EXP-${System.currentTimeMillis().toString().takeLast(8)}" }
+
+            // System Generated Reference
+            Column {
+                Text("Payment Reference Number", fontWeight = FontWeight.Bold, fontSize = 14.sp, color = TextSecondary)
+                Spacer(Modifier.height(8.dp))
+                OutlinedTextField(
+                    value = generatedRef,
+                    onValueChange = { _ -> },
+                    readOnly = true,
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp),
+                    leadingIcon = { Icon(Icons.Default.Numbers, contentDescription = null, tint = OrthodoxBlue) },
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = OrthodoxBlue,
+                        unfocusedBorderColor = OrthodoxBlue.copy(alpha = 0.5f),
+                        unfocusedTextColor = OrthodoxBlue,
+                        focusedTextColor = OrthodoxBlue
+                    ),
+                    textStyle = androidx.compose.ui.text.TextStyle(fontWeight = FontWeight.ExtraBold, fontSize = 18.sp)
+                )
+                Text("This reference number replaces a physical receipt. Please save it for your records.", fontSize = 11.sp, color = TextSecondary, modifier = Modifier.padding(top = 4.dp))
             }
 
             Spacer(Modifier.height(20.dp))
@@ -204,8 +227,10 @@ fun RecordExpenseScreen(viewModel: FinancialViewModel, onBack: () -> Unit) {
                         if (amt <= 0) {
                             Toast.makeText(context, "Invalid amount", Toast.LENGTH_SHORT).show()
                         } else {
-                            viewModel.addExpense(amt, recipient, 1L, 1L, selectedCategory, description)
-                            Toast.makeText(context, "Expense submitted for approval!", Toast.LENGTH_LONG).show()
+                            val currentUser = viewModel.currentUser.value
+                            val churchId = currentUser?.churchId ?: 1L
+                            viewModel.addExpense(amt, recipient, 1L, churchId, selectedCategory, description, paymentMethod = "Cash", referenceNumber = generatedRef)
+                            Toast.makeText(context, "Expense submitted for approval! Ref: $generatedRef", Toast.LENGTH_LONG).show()
                             onBack()
                         }
                     }

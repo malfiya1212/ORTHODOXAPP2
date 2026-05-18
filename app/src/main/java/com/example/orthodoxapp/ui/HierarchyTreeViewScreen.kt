@@ -25,7 +25,7 @@ import com.example.orthodoxapp.ui.theme.*
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun HierarchyTreeViewScreen(viewModel: FinancialViewModel, onBack: () -> Unit) {
+fun HierarchyTreeViewScreen(viewModel: FinancialViewModel, onBack: () -> Unit, onNavigate: (String) -> Unit = {}) {
     val dioceses by viewModel.dioceses.collectAsState(initial = emptyList())
     val churches by viewModel.churches.collectAsState(initial = emptyList())
 
@@ -89,7 +89,8 @@ fun HierarchyTreeViewScreen(viewModel: FinancialViewModel, onBack: () -> Unit) {
             items(dioceses, key = { it.id }) { diocese ->
                 DioceseNode(
                     diocese = diocese,
-                    churches = churches.filter { it.dioceseId == diocese.id }
+                    churches = churches.filter { it.dioceseId == diocese.id },
+                    onNavigate = onNavigate
                 )
             }
         }
@@ -97,7 +98,7 @@ fun HierarchyTreeViewScreen(viewModel: FinancialViewModel, onBack: () -> Unit) {
 }
 
 @Composable
-fun DioceseNode(diocese: Diocese, churches: List<Church>) {
+fun DioceseNode(diocese: Diocese, churches: List<Church>, onNavigate: (String) -> Unit) {
     var expanded by remember { mutableStateOf(false) }
 
     Column {
@@ -113,7 +114,7 @@ fun DioceseNode(diocese: Diocese, churches: List<Church>) {
         AnimatedVisibility(visible = expanded) {
             Column {
                 churches.forEach { church ->
-                    ChurchLeaf(church = church, level = 1)
+                    ChurchLeaf(church = church, level = 1, onNavigate = onNavigate)
                 }
             }
         }
@@ -121,15 +122,15 @@ fun DioceseNode(diocese: Diocese, churches: List<Church>) {
 }
 
 @Composable
-fun ChurchLeaf(church: Church, level: Int) {
+fun ChurchLeaf(church: Church, level: Int, onNavigate: (String) -> Unit) {
     HierarchyItem(
         title = church.name,
-        subtitle = "Active Status",
+        subtitle = "Tap to view parish details",
         icon = Icons.Default.Church,
         level = level,
         expanded = false,
-        onToggle = {},
-        isLeaf = true
+        onToggle = { onNavigate("church_detail/${church.id}") },
+        isLeaf = false
     )
 }
 

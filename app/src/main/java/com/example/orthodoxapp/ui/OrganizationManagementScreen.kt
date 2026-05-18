@@ -82,19 +82,24 @@ fun OrganizationManagementScreen(
             )
         },
         floatingActionButton = {
-            FloatingActionButton(
-                onClick = { 
-                    val currentType = when(tabs.getOrElse(selectedTab) { "" }) {
-                        "Dioceses" -> "Diocese"
-                        "Churches" -> "Church"
-                        else -> null
-                    }
-                    onAddClick(currentType) 
-                },
-                containerColor = Color(0xFF3F3D89),
-                contentColor = Color.White
-            ) {
-                Icon(Icons.Default.Add, contentDescription = "Add")
+            val currentTabTitle = tabs.getOrElse(selectedTab) { "" }
+            val isSynodAdminViewingChurches = role == UserRole.SYNOD_ADMIN && currentTabTitle == "Churches"
+            
+            if (!isSynodAdminViewingChurches) {
+                FloatingActionButton(
+                    onClick = { 
+                        val currentType = when(currentTabTitle) {
+                            "Dioceses" -> "Diocese"
+                            "Churches" -> "Church"
+                            else -> null
+                        }
+                        onAddClick(currentType) 
+                    },
+                    containerColor = Color(0xFF3F3D89),
+                    contentColor = Color.White
+                ) {
+                    Icon(Icons.Default.Add, contentDescription = "Add")
+                }
             }
         }
     ) { padding ->

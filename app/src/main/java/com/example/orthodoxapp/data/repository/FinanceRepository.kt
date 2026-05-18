@@ -7,6 +7,7 @@ import com.example.orthodoxapp.data.model.*
 import com.example.orthodoxapp.data.network.ApiService
 import com.example.orthodoxapp.data.network.AuthResponse
 import com.example.orthodoxapp.data.network.LoginRequest
+import com.example.orthodoxapp.util.EmailUtility
 import com.example.orthodoxapp.security.SecurityManager
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
@@ -17,8 +18,10 @@ class FinanceRepository(
     private val db: AppDatabase,
     private val dao: FinanceDao,
     private val syncDao: SyncDao,
-    private val api: ApiService
+    private val api: ApiService,
+    private val exchangeRateApi: com.example.orthodoxapp.data.network.ExchangeRateApiService
 ) {
+    suspend fun getLatestExchangeRates(base: String) = exchangeRateApi.getLatestRates(base)
     // Auth Methods
     suspend fun login(email: String, passwordRaw: String): Result<AuthResponse> {
         return try {
@@ -81,12 +84,69 @@ class FinanceRepository(
     }
 
     // Organization Methods
-    suspend fun addDiocese(name: String, bishopName: String? = null, description: String? = null) {
-        dao.insertDiocese(Diocese(name = name, bishopName = bishopName, description = description))
+    suspend fun addDiocese(name: String, bishopName: String? = null, location: String? = null, description: String? = null): Long {
+        return dao.insertDiocese(Diocese(name = name, bishopName = bishopName, location = location, description = description))
     }
 
     suspend fun addChurch(name: String, location: String, dioceseId: Long? = 1L): Long {
-        return dao.insertChurch(Church(name = name, location = location, dioceseId = dioceseId, status = "PENDING"))
+        return dao.insertChurch(Church(name = name, location = location, dioceseId = dioceseId, status = "ACTIVE"))
+    }
+
+    suspend fun addOrganizationWithAdmin(
+        type: String,
+        name: String,
+        location: String,
+        parentId: Long?,
+        admin: User
+    ) {
+        db.withTransaction {
+            if (type == "Diocese") {
+                val dioceseId = dao.insertDiocese(Diocese(name = name, location = location))
+                val adminUser = admin.copy(
+                    dioceseId = dioceseId,
+                    churchId = null,
+                    role = "DIOCESE_ADMIN",
+                    roleId = 2L
+                )
+                dao.insertUser(adminUser)
+            } else {
+                val churchId = dao.insertChurch(Church(name = name, location = location, dioceseId = parentId, status = "ACTIVE"))
+                val adminUser = admin.copy(
+                    dioceseId = parentId,
+                    churchId = churchId,
+                    role = "CHURCH_ADMIN",
+                    roleId = 3L
+                )
+                dao.insertUser(adminUser)
+            }
+        }
+    }
+
+    suspend fun addDioceseWithChurchAndAdmin(
+        dioceseName: String,
+        dioceseLocation: String?,
+        churchName: String,
+        churchLocation: String?,
+        admin: User
+    ) {
+        db.withTransaction {
+            val dioceseId = dao.insertDiocese(Diocese(name = dioceseName, location = dioceseLocation))
+            val churchId = dao.insertChurch(
+                Church(
+                    name = churchName,
+                    location = churchLocation,
+                    dioceseId = dioceseId,
+                    status = "ACTIVE"
+                )
+            )
+            val adminUser = admin.copy(
+                dioceseId = dioceseId,
+                churchId = churchId,
+                role = "CHURCH_ADMIN",
+                roleId = 3L
+            )
+            dao.insertUser(adminUser)
+        }
     }
 
 
@@ -100,14 +160,90 @@ class FinanceRepository(
         return dao.insertUser(user)
     }
 
+    suspend fun updateUser(user: User) {
+        dao.updateUser(user)
+    }
+
     suspend fun getUserByEmail(email: String): User? {
         return dao.getUserByEmail(email)
     }
 
-    suspend fun addIncome(amount: Double, source: String, accountId: Long, churchId: Long, category: String? = null, status: String = "PENDING", userId: Long = 1L, description: String? = null, paymentMethod: String? = "Cash", referenceNumber: String? = null) {
-        val id = dao.insertIncome(Income(amount = amount, date = System.currentTimeMillis(), source = source, accountId = accountId, churchId = churchId, category = category, status = status, createdBy = userId, description = description, paymentMethod = paymentMethod, referenceNumber = referenceNumber))
+    suspend fun checkInactiveMembers() {
+        val sixMonthsInMillis = 180L * 24 * 60 * 60 * 1000
+        val sixMonthsAgo = System.currentTimeMillis() - sixMonthsInMillis
+        dao.deactivateInactiveMembers(sixMonthsAgo)
+    }
+
+    suspend fun addIncome(
+        amount: Double,
+        source: String,
+        accountId: Long,
+        churchId: Long,
+        category: String? = "Other",
+        status: String = "PENDING",
+        userId: Long = 1L,
+        description: String? = null,
+        paymentMethod: String? = "Cash",
+        referenceNumber: String? = null,
+        originalAmount: Double? = null,
+        originalCurrency: String? = "ETB"
+    ) {
+        val id = dao.insertIncome(
+            Income(
+                amount = amount,
+                date = System.currentTimeMillis(),
+                source = source,
+                accountId = accountId,
+                churchId = churchId,
+                category = category ?: "Other",
+                status = status,
+                createdBy = userId,
+                description = description,
+                paymentMethod = paymentMethod,
+                referenceNumber = referenceNumber,
+                originalAmount = originalAmount,
+                originalCurrency = originalCurrency
+            )
+        )
         syncDao.addToQueue(SyncQueue(entityType = "INCOME", entityId = id, action = "INSERT"))
         repositoryLogAction(userId, "RECORD_INCOME", "Income of $amount ETB recorded: ${description ?: source}", "income", id)
+
+        
+        // Notification to Church Admin
+        val admin = dao.getChurchAdminSync(churchId)
+        if (admin != null && admin.id != userId) {
+            val contributor = dao.getUserByIdSync(userId)
+            val church = dao.getChurchByIdSync(churchId)
+            val contributorName = contributor?.name ?: "Unknown Member"
+            val churchName = church?.name ?: "Church"
+
+            // Insert admin notification
+            dao.insertNotification(
+                Notification(
+                    userId = admin.id,
+                    title = "New Contribution Approval",
+                    message = "Ref: ${referenceNumber ?: "N/A"} - $contributorName ($churchName) contributed $amount ETB. Awaiting your approval.",
+                    type = "Approval",
+                    entityId = id
+                )
+            )
+
+            // Send reference email to admin
+            EmailUtility.sendReferenceEmail(
+                recipientEmail = admin.email,
+                referenceNumber = referenceNumber ?: "N/A",
+                memberName = contributorName,
+                amount = amount,
+                paymentMethod = paymentMethod ?: "Cash"
+            )
+        }
+
+        // Auto-activate member if inactive
+        val user = dao.getUserByIdSync(userId)
+        if (user != null && user.status == "INACTIVE") {
+            dao.updateUser(user.copy(status = "ACTIVE"))
+            repositoryLogAction(1L, "ACTIVATE_MEMBER", "User ${user.name} was auto-activated due to new contribution.")
+        }
     }
 
     suspend fun addExpense(amount: Double, recipient: String, accountId: Long, churchId: Long, category: String, status: String = "PENDING", userId: Long = 1L, description: String? = null, paymentMethod: String? = "Cash", referenceNumber: String? = null) {
@@ -133,6 +269,18 @@ class FinanceRepository(
     suspend fun rejectIncome(id: Long, userId: Long) {
         dao.updateIncomeStatus(id, "REJECTED")
         repositoryLogAction(userId, "REJECT_INCOME", "Income record $id rejected")
+    }
+
+    suspend fun pushNotificationToChurch(churchId: Long, title: String, message: String, type: String) {
+        val members = dao.getUsersByChurch(churchId).first()
+        for (member in members) {
+            dao.insertNotification(Notification(
+                userId = member.id,
+                title = title,
+                message = message,
+                type = type
+            ))
+        }
     }
 
     suspend fun approveExpense(id: Long, userId: Long) {
@@ -180,6 +328,32 @@ class FinanceRepository(
     suspend fun addChurchAsset(name: String, type: String, value: Double, churchId: Long, description: String? = null) {
         dao.insertAsset(ChurchAsset(name = name, type = type, value = value, churchId = churchId, description = description))
         repositoryLogAction(1L, "REGISTER_ASSET", "Asset $name ($type) registered", "church_assets")
+    }
+
+    fun getCertificatesByUser(userId: Long): Flow<List<Certificate>> = dao.getCertificatesByUserId(userId)
+
+    suspend fun addCertificate(userId: Long, churchId: Long, title: String, awardType: String, description: String? = null, issuerId: Long) {
+        val certSerial = "CERT-${System.currentTimeMillis().toString().takeLast(6)}-${userId}"
+        dao.insertCertificate(Certificate(
+            userId = userId,
+            churchId = churchId,
+            title = title,
+            awardType = awardType,
+            description = description,
+            issuedBy = issuerId,
+            certificateId = certSerial
+        ))
+        
+        // Notify the user
+        dao.insertNotification(Notification(
+            userId = userId,
+            title = "New Award Received!",
+            message = "Congratulations! You have been awarded a '$title' certificate for your $awardType.",
+            type = "Award",
+            entityId = null
+        ))
+        
+        repositoryLogAction(issuerId, "ISSUE_CERTIFICATE", "Certificate $certSerial issued to user $userId", "certificates")
     }
 
     suspend fun submitForApproval(entityType: String, entityId: Long, reviewerId: Long, comments: String? = null) {

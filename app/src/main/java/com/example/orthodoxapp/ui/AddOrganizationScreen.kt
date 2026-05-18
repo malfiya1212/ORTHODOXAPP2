@@ -1,7 +1,9 @@
 package com.example.orthodoxapp.ui
 
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.*
@@ -32,6 +34,8 @@ fun AddOrganizationScreen(
     var orgType by remember { mutableStateOf(initialType ?: "Church") }
     var adminName by remember { mutableStateOf("") }
     var adminEmail by remember { mutableStateOf("") }
+    var adminPassword by remember { mutableStateOf("") }
+    var confirmAdminPassword by remember { mutableStateOf("") }
     
     val dioceses by viewModel.dioceses.collectAsState()
     val churches by viewModel.churches.collectAsState()
@@ -40,6 +44,16 @@ fun AddOrganizationScreen(
 
     var typeExpanded by remember { mutableStateOf(false) }
     var dioceseExpanded by remember { mutableStateOf(false) }
+    val actionState by viewModel.actionState.collectAsState()
+    val scope = rememberCoroutineScope()
+    val snackbarHostState = remember { SnackbarHostState() }
+
+    LaunchedEffect(actionState) {
+        if (actionState is ActionState.Success) {
+            onBack()
+            viewModel.resetActionState()
+        }
+    }
 
     // Load existing data if updating or pre-fill from user role
     LaunchedEffect(orgId, orgType, dioceses, churches, currentUser, currentRole) {
@@ -53,15 +67,17 @@ fun AddOrganizationScreen(
                 }
             }
         } else {
-            // Pre-fill for new records
-            if (selectedDioceseId == null) selectedDioceseId = currentUser?.dioceseId
+            // Pre-fill for Diocese Admin
+            if (currentRole == UserRole.DIOCESE_ADMIN && selectedDioceseId == null) {
+                selectedDioceseId = currentUser?.dioceseId
+            }
         }
     }
 
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text(if (orgId == null) "Register Organization" else "Update Organization", color = Color.White) },
+                title = { Text(if (orgId == null) "Add New $orgType" else "Update $orgType", color = Color.White) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = Color.White)
@@ -69,53 +85,55 @@ fun AddOrganizationScreen(
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = PrimaryBlue)
             )
-        }
+        },
+        snackbarHost = { SnackbarHost(snackbarHostState) }
     ) { padding ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
+                .verticalScroll(rememberScrollState())
                 .padding(24.dp)
         ) {
-            Text("Organization Details", fontWeight = FontWeight.Bold, fontSize = 18.sp)
-            Spacer(modifier = Modifier.height(16.dp))
-
-            // Organization Type
-            ExposedDropdownMenuBox(
-                expanded = typeExpanded,
-                onExpandedChange = { if (orgId == null) typeExpanded = !typeExpanded }
-            ) {
-                OutlinedTextField(
-                    value = orgType,
-                    onValueChange = {},
-                    readOnly = true,
-                    label = { Text("Organization Type") },
-                    leadingIcon = { Icon(Icons.Default.Business, contentDescription = null, tint = PrimaryBlue) },
-                    modifier = Modifier.fillMaxWidth().menuAnchor(type = MenuAnchorType.PrimaryNotEditable, enabled = orgId == null),
-                    trailingIcon = { if (orgId == null) ExposedDropdownMenuDefaults.TrailingIcon(expanded = typeExpanded) },
-                    shape = RoundedCornerShape(12.dp),
-                    enabled = orgId == null
-                )
-                ExposedDropdownMenu(
+            // Type Selector (Only if new)
+            if (orgId == null) {
+                ExposedDropdownMenuBox(
                     expanded = typeExpanded,
-                    onDismissRequest = { typeExpanded = false }
+                    onExpandedChange = { typeExpanded = !typeExpanded }
                 ) {
-                    val availableTypes = if (currentRole == UserRole.SYNOD_ADMIN) listOf("Diocese") else listOf("Diocese", "Church")
-                    availableTypes.forEach { type ->
+                    OutlinedTextField(
+                        value = orgType,
+                        onValueChange = { _ -> },
+                        readOnly = true,
+                        label = { Text("Organization Type") },
+                        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = typeExpanded) },
+                        modifier = Modifier.menuAnchor(MenuAnchorType.PrimaryNotEditable).fillMaxWidth(),
+                        shape = RoundedCornerShape(12.dp)
+                    )
+                    ExposedDropdownMenu(
+                        expanded = typeExpanded,
+                        onDismissRequest = { typeExpanded = false }
+                    ) {
                         DropdownMenuItem(
-                            text = { Text(type) },
+                            text = { Text("Church / Parish") },
                             onClick = {
-                                orgType = type
+                                orgType = "Church"
+                                typeExpanded = false
+                            }
+                        )
+                        DropdownMenuItem(
+                            text = { Text("Diocese / Eparchy") },
+                            onClick = {
+                                orgType = "Diocese"
                                 typeExpanded = false
                             }
                         )
                     }
                 }
+                Spacer(modifier = Modifier.height(16.dp))
             }
 
-            Spacer(modifier = Modifier.height(16.dp))
-
-            // Parent Selection based on type
+            // Diocese Selector (Only for Church)
             if (orgType == "Church") {
                 ExposedDropdownMenuBox(
                     expanded = dioceseExpanded,
@@ -123,12 +141,11 @@ fun AddOrganizationScreen(
                 ) {
                     OutlinedTextField(
                         value = dioceses.find { it.id == selectedDioceseId }?.name ?: "Select Diocese",
-                        onValueChange = {},
+                        onValueChange = { _ -> },
                         readOnly = true,
-                        label = { Text("Diocese") },
-                        leadingIcon = { Icon(Icons.Default.Map, contentDescription = null, tint = PrimaryBlue) },
-                        modifier = Modifier.fillMaxWidth().menuAnchor(type = MenuAnchorType.PrimaryNotEditable, enabled = true),
+                        label = { Text("Parent Diocese") },
                         trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = dioceseExpanded) },
+                        modifier = Modifier.menuAnchor(MenuAnchorType.PrimaryNotEditable).fillMaxWidth(),
                         shape = RoundedCornerShape(12.dp)
                     )
                     ExposedDropdownMenu(
@@ -149,8 +166,6 @@ fun AddOrganizationScreen(
                 Spacer(modifier = Modifier.height(16.dp))
             }
 
-
-
             // Name Field
             OutlinedTextField(
                 value = name,
@@ -161,60 +176,107 @@ fun AddOrganizationScreen(
                 shape = RoundedCornerShape(12.dp)
             )
 
-            if (orgType == "Church") {
-                Spacer(modifier = Modifier.height(16.dp))
-                OutlinedTextField(
-                    value = location,
-                    onValueChange = { location = it },
-                    label = { Text("Physical Location") },
-                    leadingIcon = { Icon(Icons.Default.LocationCity, contentDescription = null, tint = PrimaryBlue) },
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(12.dp)
-                )
+            Spacer(modifier = Modifier.height(16.dp))
+            OutlinedTextField(
+                value = location,
+                onValueChange = { location = it },
+                label = { Text(if (orgType == "Church") "Physical Location" else "Headquarters Location") },
+                leadingIcon = { Icon(Icons.Default.LocationOn, contentDescription = null, tint = PrimaryBlue) },
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(12.dp)
+            )
 
-                Spacer(modifier = Modifier.height(24.dp))
-                Text("Primary Administrator", fontWeight = FontWeight.Bold, fontSize = 16.sp, color = PrimaryBlue)
-                Spacer(modifier = Modifier.height(8.dp))
-                
-                OutlinedTextField(
-                    value = adminName,
-                    onValueChange = { adminName = it },
-                    label = { Text("Admin Full Name") },
-                    leadingIcon = { Icon(Icons.Default.Person, contentDescription = null, tint = PrimaryBlue) },
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(12.dp)
-                )
-                Spacer(modifier = Modifier.height(12.dp))
-                OutlinedTextField(
-                    value = adminEmail,
-                    onValueChange = { adminEmail = it },
-                    label = { Text("Admin Email / Login ID") },
-                    leadingIcon = { Icon(Icons.Default.Email, contentDescription = null, tint = PrimaryBlue) },
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(12.dp)
+            Spacer(modifier = Modifier.height(24.dp))
+            Text("Administrative Account", fontWeight = FontWeight.Bold, color = PrimaryBlue)
+            Spacer(modifier = Modifier.height(12.dp))
+            
+            OutlinedTextField(
+                value = adminName,
+                onValueChange = { adminName = it },
+                label = { Text("Admin Full Name") },
+                leadingIcon = { Icon(Icons.Default.Person, contentDescription = null, tint = PrimaryBlue) },
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(12.dp)
+            )
+            Spacer(modifier = Modifier.height(12.dp))
+            OutlinedTextField(
+                value = adminEmail,
+                onValueChange = { adminEmail = it },
+                label = { Text("Admin Email / Login ID") },
+                leadingIcon = { Icon(Icons.Default.Email, contentDescription = null, tint = PrimaryBlue) },
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(12.dp)
+            )
+            Spacer(modifier = Modifier.height(12.dp))
+            OutlinedTextField(
+                value = adminPassword,
+                onValueChange = { adminPassword = it },
+                label = { Text("Initial Admin Password") },
+                leadingIcon = { Icon(Icons.Default.Lock, contentDescription = null, tint = PrimaryBlue) },
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(12.dp),
+                visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation()
+            )
+            Spacer(modifier = Modifier.height(12.dp))
+            OutlinedTextField(
+                value = confirmAdminPassword,
+                onValueChange = { confirmAdminPassword = it },
+                label = { Text("Confirm Admin Password") },
+                leadingIcon = { Icon(Icons.Default.Lock, contentDescription = null, tint = PrimaryBlue) },
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(12.dp),
+                visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation(),
+                isError = confirmAdminPassword.isNotEmpty() && adminPassword != confirmAdminPassword
+            )
+
+            if (confirmAdminPassword.isNotEmpty() && adminPassword != confirmAdminPassword) {
+                Text(
+                    text = "Passwords do not match",
+                    color = MaterialTheme.colorScheme.error,
+                    style = MaterialTheme.typography.bodySmall,
+                    modifier = Modifier.padding(start = 16.dp, top = 4.dp)
                 )
             }
 
-            Spacer(modifier = Modifier.weight(1f))
+            Spacer(modifier = Modifier.height(32.dp))
 
             Button(
                 onClick = {
+                    if (adminPassword != confirmAdminPassword) {
+                        scope.launch {
+                            snackbarHostState.showSnackbar("Passwords do not match")
+                        }
+                        return@Button
+                    }
                     if (orgId == null) {
                         when (orgType) {
-                            "Diocese" -> viewModel.addDiocese(name, location)
-                            "Church" -> viewModel.addChurch(name, location, selectedDioceseId ?: currentUser?.dioceseId ?: 1L, adminName, adminEmail)
+                            "Diocese" -> viewModel.addDiocese(name, location, null, adminName, adminEmail, adminPassword)
+                            "Church" -> viewModel.addChurch(name, location, selectedDioceseId ?: currentUser?.dioceseId ?: 1L, adminName, adminEmail, adminPassword)
                         }
                     } else {
                         // Update logic...
                     }
-                    onBack()
                 },
                 modifier = Modifier.fillMaxWidth().height(56.dp),
                 colors = ButtonDefaults.buttonColors(containerColor = PrimaryBlue),
                 shape = RoundedCornerShape(12.dp),
-                enabled = name.isNotEmpty() && (orgType == "Diocese" || selectedDioceseId != null)
+                enabled = name.isNotEmpty() && (orgType == "Diocese" || selectedDioceseId != null) && 
+                          adminPassword.isNotEmpty() && adminPassword == confirmAdminPassword &&
+                          actionState !is ActionState.Loading
             ) {
-                Text(if (orgId == null) "Register $orgType" else "Update $orgType", fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                if (actionState is ActionState.Loading) {
+                    CircularProgressIndicator(color = Color.White, modifier = Modifier.size(24.dp))
+                } else {
+                    Text(if (orgId == null) "Register $orgType" else "Update $orgType", fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                }
+            }
+            
+            if (actionState is ActionState.Error) {
+                Text(
+                    text = (actionState as ActionState.Error).message,
+                    color = Color.Red,
+                    modifier = Modifier.padding(top = 8.dp)
+                )
             }
         }
     }

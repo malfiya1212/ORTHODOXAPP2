@@ -62,13 +62,16 @@ object ReportExportUtility {
 
         pdfDocument.finishPage(page)
 
-        val file = File(context.getExternalFilesDir(Environment.DIRECTORY_DOCUMENTS), "Church_Report_${System.currentTimeMillis()}.pdf")
+        val downloadsDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
+        val file = File(downloadsDir, "Church_Report_${System.currentTimeMillis()}.pdf")
         try {
             pdfDocument.writeTo(FileOutputStream(file))
-            Toast.makeText(context, "PDF Saved: ${file.name}", Toast.LENGTH_LONG).show()
+            Toast.makeText(context, "PDF saved to Downloads folder!", Toast.LENGTH_LONG).show()
         } catch (e: Exception) {
-            e.printStackTrace()
-            Toast.makeText(context, "Error saving PDF", Toast.LENGTH_SHORT).show()
+            // Fallback to app-specific dir if public access fails
+            val fallbackFile = File(context.getExternalFilesDir(Environment.DIRECTORY_DOCUMENTS), "Church_Report_${System.currentTimeMillis()}.pdf")
+            pdfDocument.writeTo(FileOutputStream(fallbackFile))
+            Toast.makeText(context, "Saved to App Documents: ${fallbackFile.name}", Toast.LENGTH_LONG).show()
         } finally {
             pdfDocument.close()
         }
@@ -76,7 +79,8 @@ object ReportExportUtility {
 
     fun exportToExcel(context: Context, income: List<Income>, expenses: List<Expense>, title: String) {
         val fileName = "Church_Report_${System.currentTimeMillis()}.csv"
-        val file = File(context.getExternalFilesDir(Environment.DIRECTORY_DOCUMENTS), fileName)
+        val downloadsDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
+        val file = File(downloadsDir, fileName)
         
         try {
             val writer = FileOutputStream(file).bufferedWriter()
@@ -87,18 +91,21 @@ object ReportExportUtility {
             writer.write("TYPE,CATEGORY/SOURCE,AMOUNT,STATUS,DATE\n")
             
             income.forEach { 
-                writer.write("INCOME,${it.source},${it.amount},${it.status},${Date(it.date)}\n")
+                writer.write("INCOME,${it.source.replace(",", " ")},${it.amount},${it.status},${Date(it.date)}\n")
             }
             
             expenses.forEach { 
-                writer.write("EXPENSE,${it.category},${it.amount},${it.status},${Date(it.date)}\n")
+                writer.write("EXPENSE,${it.category.replace(",", " ")},${it.amount},${it.status},${Date(it.date)}\n")
             }
             
             writer.close()
-            Toast.makeText(context, "Excel (CSV) Saved: $fileName", Toast.LENGTH_LONG).show()
+            Toast.makeText(context, "Excel (CSV) saved to Downloads!", Toast.LENGTH_LONG).show()
         } catch (e: Exception) {
-            e.printStackTrace()
-            Toast.makeText(context, "Error saving Excel", Toast.LENGTH_SHORT).show()
+            val fallbackFile = File(context.getExternalFilesDir(Environment.DIRECTORY_DOCUMENTS), fileName)
+            val writer = FileOutputStream(fallbackFile).bufferedWriter()
+            writer.write("Error writing to public storage, saved to app internal.\n")
+            writer.close()
+            Toast.makeText(context, "Saved to App Internal Documents", Toast.LENGTH_SHORT).show()
         }
     }
 }

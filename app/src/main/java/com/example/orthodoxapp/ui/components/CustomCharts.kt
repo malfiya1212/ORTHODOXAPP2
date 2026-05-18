@@ -1,7 +1,9 @@
 package com.example.orthodoxapp.ui.components
 
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -57,18 +59,21 @@ fun SimpleDonutChart(
 fun SimpleBarChart(
     data: List<Float>,
     labels: List<String>,
-    barColor: Color,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    barColor: Color = Color.Blue,
+    barColors: List<Color>? = null
 ) {
-    val maxData = data.maxOrNull() ?: 1f
+    val maxData = if (data.isEmpty() || data.maxOrNull() == 0f) 1f else data.maxOrNull()!!
 
     Row(
-        modifier = modifier.fillMaxWidth(),
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(horizontal = 4.dp),
         horizontalArrangement = Arrangement.SpaceEvenly,
         verticalAlignment = Alignment.Bottom
     ) {
-        for (i in data.indices) {
-            val heightRatio = data[i] / maxData
+        data.forEachIndexed { index, value ->
+            val colorToUse = barColors?.getOrNull(index) ?: barColor
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.Bottom,
@@ -77,23 +82,16 @@ fun SimpleBarChart(
                 Box(
                     modifier = Modifier
                         .fillMaxWidth(0.6f)
-                        .fillMaxHeight(heightRatio)
-                        .padding(bottom = 8.dp)
-                ) {
-                    Canvas(modifier = Modifier.fillMaxSize()) {
-                        drawRoundRect(
-                            color = barColor,
-                            size = Size(size.width, size.height),
-                            cornerRadius = CornerRadius(12f, 12f)
-                        )
-                    }
-                }
-                Spacer(modifier = Modifier.height(4.dp))
+                        .fillMaxHeight(value / maxData * 0.85f)
+                        .background(colorToUse, RoundedCornerShape(topStart = 6.dp, topEnd = 6.dp))
+                )
+                Spacer(modifier = Modifier.height(8.dp))
                 Text(
-                    text = labels.getOrElse(i) { "" }, 
-                    fontSize = 11.sp, 
-                    color = Color(0xFF64748B),
-                    fontWeight = FontWeight.Medium
+                    text = labels.getOrElse(index) { "" },
+                    fontSize = 9.sp,
+                    color = Color.Gray,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 1
                 )
             }
         }

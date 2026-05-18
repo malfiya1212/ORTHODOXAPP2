@@ -10,7 +10,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.*
-import androidx.compose.material3.TabRowDefaults.tabIndicatorOffset
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -19,17 +18,106 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.orthodoxapp.ui.theme.*
+import com.example.orthodoxapp.data.model.*
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MemberManagementScreen(viewModel: FinancialViewModel, onBack: () -> Unit) {
     var searchQuery by remember { mutableStateOf("") }
-    var selectedMonth by remember { mutableStateOf("Meskerem") }
+    var showAddDialog by remember { mutableStateOf(false) }
+    var selectedMemberForCert by remember { mutableStateOf<User?>(null) }
+
+    val users by viewModel.users.collectAsState()
+    val currentUser by viewModel.currentUser.collectAsState()
     
-    val ethiopianMonths = listOf(
-        "Meskerem", "Tikimt", "Hidar", "Tahsas", "Tir", "Yekatit", 
-        "Megabit", "Miyazia", "Ginbot", "Sene", "Hamle", "Nehasse"
-    )
+    val members = users.filter { it.roleId == 6L && it.churchId == currentUser?.churchId }
+
+    if (showAddDialog) {
+        var newName by remember { mutableStateOf("") }
+        var newEmail by remember { mutableStateOf("") }
+        
+        AlertDialog(
+            onDismissRequest = { showAddDialog = false },
+            title = { Text("Add New Member") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedTextField(
+                        value = newName,
+                        onValueChange = { newName = it },
+                        label = { Text("Full Name") },
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    OutlinedTextField(
+                        value = newEmail,
+                        onValueChange = { newEmail = it },
+                        label = { Text("Email Address") },
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+            },
+            confirmButton = {
+                Button(onClick = {
+                    currentUser?.churchId?.let { cid ->
+                        viewModel.addUser(newName, newEmail, 6L, cid)
+                    }
+                    showAddDialog = false
+                }) {
+                    Text("Add Member")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showAddDialog = false }) { Text("Cancel") }
+            }
+        )
+    }
+
+    if (selectedMemberForCert != null) {
+        var certTitle by remember { mutableStateOf("") }
+        var certType by remember { mutableStateOf("Service") }
+        var certDesc by remember { mutableStateOf("") }
+
+        AlertDialog(
+            onDismissRequest = { selectedMemberForCert = null },
+            title = { Text("Issue Certificate to ${selectedMemberForCert?.name}") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    OutlinedTextField(
+                        value = certTitle,
+                        onValueChange = { certTitle = it },
+                        label = { Text("Award Title (e.g. Baptism Certificate)") },
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    OutlinedTextField(
+                        value = certType,
+                        onValueChange = { certType = it },
+                        label = { Text("Category (Service, Baptism, etc.)") },
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    OutlinedTextField(
+                        value = certDesc,
+                        onValueChange = { certDesc = it },
+                        label = { Text("Description (Optional)") },
+                        modifier = Modifier.fillMaxWidth(),
+                        minLines = 2
+                    )
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        viewModel.issueCertificate(selectedMemberForCert!!.id, certTitle, certType, certDesc)
+                        selectedMemberForCert = null
+                    },
+                    enabled = certTitle.isNotBlank() && certType.isNotBlank()
+                ) {
+                    Text("Issue Award")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { selectedMemberForCert = null }) { Text("Cancel") }
+            }
+        )
+    }
 
     Scaffold(
         topBar = {
@@ -49,20 +137,19 @@ fun MemberManagementScreen(viewModel: FinancialViewModel, onBack: () -> Unit) {
             )
         },
         floatingActionButton = {
-            FloatingActionButton(onClick = { /* Add Member */ }, containerColor = OrthodoxGold, contentColor = Color.Black) {
+            FloatingActionButton(onClick = { showAddDialog = true }, containerColor = OrthodoxGold, contentColor = Color.Black) {
                 Icon(Icons.Default.PersonAdd, contentDescription = "Add Member")
             }
         }
     ) { padding ->
         Column(modifier = Modifier.fillMaxSize().padding(padding).background(BackgroundLight)) {
-            // Search and Filter Header
             Surface(color = OrthodoxBlue, modifier = Modifier.fillMaxWidth()) {
                 Column(modifier = Modifier.padding(16.dp)) {
                     OutlinedTextField(
                         value = searchQuery,
                         onValueChange = { searchQuery = it },
                         modifier = Modifier.fillMaxWidth(),
-                        placeholder = { Text("Search by name or ID...", color = PureLinen.copy(alpha = 0.6f)) },
+                        placeholder = { Text("Search by name...", color = PureLinen.copy(alpha = 0.6f)) },
                         leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, tint = PureLinen) },
                         colors = OutlinedTextFieldDefaults.colors(
                             unfocusedBorderColor = PureLinen.copy(alpha = 0.3f),
@@ -74,27 +161,6 @@ fun MemberManagementScreen(viewModel: FinancialViewModel, onBack: () -> Unit) {
                         shape = RoundedCornerShape(12.dp)
                     )
                     Spacer(Modifier.height(12.dp))
-                    ScrollableTabRow(
-                        selectedTabIndex = ethiopianMonths.indexOf(selectedMonth),
-                        containerColor = Color.Transparent,
-                        contentColor = PureLinen,
-                        edgePadding = 0.dp,
-                        divider = {},
-                        indicator = { tabPositions ->
-                            TabRowDefaults.SecondaryIndicator(
-                                Modifier.tabIndicatorOffset(tabPositions[ethiopianMonths.indexOf(selectedMonth)]),
-                                color = OrthodoxGold
-                            )
-                        }
-                    ) {
-                        ethiopianMonths.forEach { month ->
-                            Tab(
-                                selected = selectedMonth == month,
-                                onClick = { selectedMonth = month },
-                                text = { Text(month, fontSize = 12.sp) }
-                            )
-                        }
-                    }
                 }
             }
 
@@ -104,12 +170,12 @@ fun MemberManagementScreen(viewModel: FinancialViewModel, onBack: () -> Unit) {
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 item {
-                    Text("Monthly Gisat Overview", fontWeight = FontWeight.ExtraBold, fontSize = 18.sp, color = TextPrimary)
+                    Text("Parish Members", fontWeight = FontWeight.ExtraBold, fontSize = 18.sp, color = TextPrimary)
                     Spacer(Modifier.height(8.dp))
                 }
 
-                items(mockMembers.filter { it.name.contains(searchQuery, ignoreCase = true) }) { member ->
-                    MemberRow(member, selectedMonth)
+                items(members.filter { it.name.contains(searchQuery, ignoreCase = true) }) { member ->
+                    MemberRow(member, onAward = { selectedMemberForCert = member })
                 }
             }
         }
@@ -117,7 +183,7 @@ fun MemberManagementScreen(viewModel: FinancialViewModel, onBack: () -> Unit) {
 }
 
 @Composable
-fun MemberRow(member: ParishMember, month: String) {
+fun MemberRow(member: User, onAward: () -> Unit) {
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(16.dp),
@@ -127,47 +193,32 @@ fun MemberRow(member: ParishMember, month: String) {
         Row(modifier = Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
             Surface(modifier = Modifier.size(48.dp), shape = CircleShape, color = OrthodoxBlue.copy(alpha = 0.1f)) {
                 Box(contentAlignment = Alignment.Center) {
-                    Text(member.name.take(1), fontWeight = FontWeight.Bold, color = OrthodoxBlue, fontSize = 18.sp)
+                    Text(member.name.take(1).uppercase(), fontWeight = FontWeight.Bold, color = OrthodoxBlue, fontSize = 18.sp)
                 }
             }
             Spacer(Modifier.width(16.dp))
             Column(modifier = Modifier.weight(1f)) {
                 Text(member.name, fontWeight = FontWeight.Bold, fontSize = 16.sp, color = TextPrimary)
-                Text("Member ID: ${member.idCode}", fontSize = 11.sp, color = TextSecondary)
+                Text(member.email, fontSize = 11.sp, color = TextSecondary)
             }
-            Column(horizontalAlignment = Alignment.End) {
-                val isPaid = member.paymentStatus[month] ?: false
+            Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                val isActive = member.status == "ACTIVE"
                 Surface(
-                    color = if (isPaid) SuccessGreen.copy(alpha = 0.1f) else Color.LightGray.copy(alpha = 0.1f),
+                    color = if (isActive) SuccessGreen.copy(alpha = 0.1f) else Color.Gray.copy(alpha = 0.1f),
                     shape = RoundedCornerShape(8.dp)
                 ) {
                     Text(
-                        if (isPaid) "Paid" else "Pending",
+                        if (isActive) "Active" else "Inactive",
                         modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
-                        color = if (isPaid) SuccessGreen else TextSecondary,
+                        color = if (isActive) SuccessGreen else TextSecondary,
                         fontWeight = FontWeight.Bold,
                         fontSize = 12.sp
                     )
                 }
-                if (isPaid) {
-                    Text("Birr ${member.monthlyAmount}", fontSize = 11.sp, color = TextSecondary)
+                IconButton(onClick = onAward, modifier = Modifier.size(32.dp)) {
+                    Icon(Icons.Default.WorkspacePremium, contentDescription = "Award Certificate", tint = OrthodoxGoldDark, modifier = Modifier.size(20.dp))
                 }
             }
         }
     }
 }
-
-data class ParishMember(
-    val name: String, 
-    val idCode: String, 
-    val monthlyAmount: Double, 
-    val paymentStatus: Map<String, Boolean>
-)
-
-val mockMembers = listOf(
-    ParishMember("Abebe Bikila", "P-001", 500.0, mapOf("Meskerem" to true, "Tikimt" to true, "Hidar" to false)),
-    ParishMember("Tewodros Kassahun", "P-002", 1000.0, mapOf("Meskerem" to true, "Tikimt" to false, "Hidar" to false)),
-    ParishMember("Mulugeta Tesfaye", "P-003", 250.0, mapOf("Meskerem" to true, "Tikimt" to true, "Hidar" to true)),
-    ParishMember("Selamawit Yohannes", "P-004", 750.0, mapOf("Meskerem" to true, "Tikimt" to true, "Hidar" to false)),
-    ParishMember("Gebre Egziabher", "P-005", 2000.0, mapOf("Meskerem" to false, "Tikimt" to false, "Hidar" to false))
-)

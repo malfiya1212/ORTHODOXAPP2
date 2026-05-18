@@ -9,8 +9,6 @@ enum class UserRole {
     SYNOD_ADMIN,    // Holy Synod - supreme church authority
     DIOCESE_ADMIN,  // Diocese / Eparchy - bishop's area
     CHURCH_ADMIN,   // Individual church / parish
-    ACCOUNTANT,     // Church financial officer
-    AUDITOR,        // Read-only auditor
     MEMBER          // Regular member
 }
 
@@ -48,6 +46,7 @@ data class Diocese(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
     val name: String,
     val bishopName: String? = null,
+    val location: String? = null,
     val description: String? = null
 )
 
@@ -155,7 +154,7 @@ data class Income(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
     val churchId: Long,
     val accountId: Long,
-    val amount: Double,
+    val amount: Double, // Converted to ETB
     val source: String, // Tithe, Donation
     val status: String = "PENDING", // PENDING, APPROVED
     val createdBy: Long,
@@ -164,7 +163,9 @@ data class Income(
     val date: Long = System.currentTimeMillis(),
     val description: String? = null,
     val paymentMethod: String? = "Cash",
-    val referenceNumber: String? = null
+    val referenceNumber: String? = null,
+    val originalAmount: Double? = null,
+    val originalCurrency: String? = "ETB"
 )
 
 @Entity(
@@ -297,6 +298,7 @@ data class Notification(
     val title: String,
     val message: String,
     val type: String, // Payment, Approval, Alert
+    val entityId: Long? = null,
     val isRead: Boolean = false,
     val date: Long = System.currentTimeMillis()
 )
@@ -598,6 +600,8 @@ data class Report(
     val generatedBy: Long
 )
 
+// Certificate moved to separate file Certificate.kt
+
 // --- DTOs for UI ---
 
 data class PaymentReceipt(
@@ -612,3 +616,5 @@ data class PaymentReceipt(
     val generatedBy: String,
     val verificationUrl: String
 )
+
+data class Currency(val code: String, val flag: String, val rateToEtb: Double)

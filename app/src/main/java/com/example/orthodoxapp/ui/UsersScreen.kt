@@ -102,22 +102,22 @@ fun UsersScreen(viewModel: FinancialViewModel, onBack: () -> Unit) {
 
     if (showAddUserDialog) {
         AddUserDialog(
+            viewModel = viewModel,
             onDismiss = { showAddUserDialog = false },
-            onConfirm = { name, email, roleName ->
+            onConfirm = { name, email, roleName, churchId, dioceseId ->
                 val roleId = when(roleName) {
                     "Super Admin" -> 1L
                     "Diocese Admin" -> 2L
-                    "Church Admin" -> 5L
-                    "Accountant" -> 6L
-                    "Auditor" -> 7L
-                    else -> 9L // Member
+                    "Church Admin" -> 3L // Updated to match getRoleFromId
+                    else -> 6L // Member
                 }
                 
                 viewModel.addUser(
                     name = name,
                     email = email,
                     roleId = roleId,
-                    churchId = currentUser?.churchId
+                    churchId = churchId,
+                    dioceseId = dioceseId
                 )
                 showAddUserDialog = false
             }
@@ -161,8 +161,6 @@ fun UserCard(user: User) {
                         1L -> "Super Admin"
                         2L -> "Diocese Admin"
                         3L -> "Church Admin"
-                        4L -> "Accountant"
-                        5L -> "Auditor"
                         else -> "Member"
                     }
                     Surface(
@@ -199,18 +197,40 @@ fun UserCard(user: User) {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun AddUserDialog(onDismiss: () -> Unit, onConfirm: (String, String, String) -> Unit) {
+fun AddUserDialog(
+    viewModel: FinancialViewModel,
+    onDismiss: () -> Unit, 
+    onConfirm: (String, String, String, Long?, Long?) -> Unit
+) {
     var name by remember { mutableStateOf("") }
     var email by remember { mutableStateOf("") }
     var selectedRole by remember { mutableStateOf("Member") }
     
+    val dioceses by viewModel.dioceses.collectAsState()
+    val churches by viewModel.churches.collectAsState()
+    
+    var selectedDioceseId by remember { mutableStateOf<Long?>(null) }
+    var selectedChurchId by remember { mutableStateOf<Long?>(null) }
+    
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Add New User") },
+        title = { Text("Register Official / Member") },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                OutlinedTextField(value = name, onValueChange = { name = it }, label = { Text("Full Name") })
-                OutlinedTextField(value = email, onValueChange = { email = it }, label = { Text("Email") })
+                OutlinedTextField(
+                    value = name, 
+                    onValueChange = { name = it }, 
+                    label = { Text("Full Name") },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp)
+                )
+                OutlinedTextField(
+                    value = email, 
+                    onValueChange = { email = it }, 
+                    label = { Text("Email Address") },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp)
+                )
                 
                 var expandedRole by remember { mutableStateOf(false) }
                 ExposedDropdownMenuBox(
@@ -219,15 +239,15 @@ fun AddUserDialog(onDismiss: () -> Unit, onConfirm: (String, String, String) -> 
                 ) {
                     OutlinedTextField(
                         value = selectedRole,
-                        onValueChange = {},
+                        onValueChange = { _ -> },
                         readOnly = true,
                         label = { Text("Assign Role") },
                         trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expandedRole) },
-                        modifier = Modifier.fillMaxWidth().menuAnchor(type = MenuAnchorType.PrimaryNotEditable, enabled = true),
+                        modifier = Modifier.fillMaxWidth().menuAnchor(MenuAnchorType.PrimaryNotEditable),
                         shape = RoundedCornerShape(12.dp)
                     )
                     ExposedDropdownMenu(expanded = expandedRole, onDismissRequest = { expandedRole = false }) {
-                        listOf("Member", "Church Admin", "Accountant", "Auditor", "Diocese Admin", "Super Admin").forEach { role ->
+                        listOf("Member", "Church Admin", "Diocese Admin", "Super Admin").forEach { role ->
                             DropdownMenuItem(
                                 text = { Text(role) },
                                 onClick = { selectedRole = role; expandedRole = false }
@@ -236,15 +256,71 @@ fun AddUserDialog(onDismiss: () -> Unit, onConfirm: (String, String, String) -> 
                     }
                 }
 
+                // Diocese Selector for Diocese Admins or Church-level roles
+                if (selectedRole != "Member" && selectedRole != "Super Admin") {
+                    var expandedDiocese by remember { mutableStateOf(false) }
+                    ExposedDropdownMenuBox(
+                        expanded = expandedDiocese,
+                        onExpandedChange = { expandedDiocese = !expandedDiocese }
+                    ) {
+                        OutlinedTextField(
+                            value = dioceses.find { it.id == selectedDioceseId }?.name ?: "Select Diocese",
+                            onValueChange = { _ -> },
+                            readOnly = true,
+                            label = { Text("Assign to Diocese") },
+                            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expandedDiocese) },
+                            modifier = Modifier.fillMaxWidth().menuAnchor(MenuAnchorType.PrimaryNotEditable),
+                            shape = RoundedCornerShape(12.dp)
+                        )
+                        ExposedDropdownMenu(expanded = expandedDiocese, onDismissRequest = { expandedDiocese = false }) {
+                            dioceses.forEach { d ->
+                                DropdownMenuItem(
+                                    text = { Text(d.name) },
+                                    onClick = { selectedDioceseId = d.id; expandedDiocese = false }
+                                )
+                            }
+                        }
+                    }
+                }
+
+                // Church Selector for Church-level roles
+                if (selectedRole == "Church Admin") {
+                    var expandedChurch by remember { mutableStateOf(false) }
+                    val filteredChurches = churches.filter { it.dioceseId == selectedDioceseId }
+                    
+                    ExposedDropdownMenuBox(
+                        expanded = expandedChurch,
+                        onExpandedChange = { expandedChurch = !expandedChurch }
+                    ) {
+                        OutlinedTextField(
+                            value = filteredChurches.find { it.id == selectedChurchId }?.name ?: "Select Parish",
+                            onValueChange = { _ -> },
+                            readOnly = true,
+                            label = { Text("Assign to Parish") },
+                            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expandedChurch) },
+                            modifier = Modifier.fillMaxWidth().menuAnchor(MenuAnchorType.PrimaryNotEditable),
+                            shape = RoundedCornerShape(12.dp)
+                        )
+                        ExposedDropdownMenu(expanded = expandedChurch, onDismissRequest = { expandedChurch = false }) {
+                            filteredChurches.forEach { c ->
+                                DropdownMenuItem(
+                                    text = { Text(c.name) },
+                                    onClick = { selectedChurchId = c.id; expandedChurch = false }
+                                )
+                            }
+                        }
+                    }
+                }
             }
         },
         confirmButton = {
             Button(
-                onClick = { onConfirm(name, email, selectedRole) },
+                onClick = { onConfirm(name, email, selectedRole, selectedChurchId, selectedDioceseId) },
                 colors = ButtonDefaults.buttonColors(containerColor = OrthodoxBlue),
-                shape = RoundedCornerShape(12.dp)
+                shape = RoundedCornerShape(12.dp),
+                enabled = name.isNotBlank() && email.isNotBlank()
             ) {
-                Text("Register Member")
+                Text("Register Account")
             }
         },
         dismissButton = {

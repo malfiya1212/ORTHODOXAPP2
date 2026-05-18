@@ -75,11 +75,11 @@ fun AddChureGroupScreen(viewModel: FinancialViewModel, onBack: () -> Unit) {
             ) {
                 OutlinedTextField(
                     value = selectedFrequency,
-                    onValueChange = {},
+                    onValueChange = { _ -> },
                     readOnly = true,
                     label = { Text("Rotation Frequency") },
                     trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
-                    modifier = Modifier.menuAnchor(type = MenuAnchorType.PrimaryNotEditable, enabled = true).fillMaxWidth(),
+                    modifier = Modifier.menuAnchor(MenuAnchorType.PrimaryNotEditable).fillMaxWidth(),
                     shape = RoundedCornerShape(12.dp),
                     leadingIcon = { Icon(Icons.Default.Update, contentDescription = null, tint = PrimaryBlue) }
                 )

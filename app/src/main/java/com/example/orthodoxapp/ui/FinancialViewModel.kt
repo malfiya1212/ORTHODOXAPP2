@@ -44,6 +44,54 @@ class FinancialViewModel(private val repository: FinanceRepository) : ViewModel(
     val isDarkMode = MutableStateFlow(false)
     val currentLanguage = MutableStateFlow(com.example.orthodoxapp.util.Language.ENGLISH)
     
+    private val _exchangeRates = MutableStateFlow<Map<String, Double>>(mapOf("USD" to 110.0, "EUR" to 120.0, "GBP" to 140.0, "ETB" to 1.0))
+    val exchangeRates: StateFlow<Map<String, Double>> = _exchangeRates
+
+    fun fetchExchangeRates() {
+        viewModelScope.launch {
+            try {
+                val response = repository.getLatestExchangeRates("USD")
+                if (response.isSuccessful) {
+                    response.body()?.let { 
+                        // Cross-calculate ETB if USD is base
+                        val rates = it.rates
+                        val etbRate = rates["ETB"] ?: 115.0
+                        _exchangeRates.value = rates.mapValues { entry -> 
+                            // We want rates relative to ETB for easy multiplication, 
+                            // but the API usually gives rates relative to USD.
+                            // However, in GlobalPaymentScreen, we use enteredAmount * rateToEtb.
+                            // So if USD is base, 1 USD = etbRate ETB.
+                            // If base is USD: USD=1.0 -> ETB=etbRate.
+                            // So enteredAmount (USD) * etbRate = ETB amount.
+                            // Thus, for a currency 'C', its rate to ETB is (1/rate_of_C_in_USD) * etbRate? 
+                            // No, usually API gives 1 USD = X Currency.
+                            // So 1 Currency = 1/X USD = (1/X) * etbRate ETB.
+                            
+                            val rateInUsd = entry.value
+                            (1.0 / rateInUsd) * etbRate
+                        }
+                    }
+                }
+            } catch (_: Exception) {}
+        }
+    }
+    
+    private val _isRefreshing = MutableStateFlow(false)
+    val isRefreshing: StateFlow<Boolean> = _isRefreshing
+
+    fun refreshData() {
+        viewModelScope.launch {
+            _isRefreshing.value = true
+            // Simulate network delay or trigger sync
+            kotlinx.coroutines.delay(1000) 
+            try {
+                // In a real app, this would be repository.sync()
+                repository.checkInactiveMembers()
+            } catch (_: Exception) {}
+            _isRefreshing.value = false
+        }
+    }
+
     fun toggleDarkMode(enabled: Boolean) {
         isDarkMode.value = enabled
     }
@@ -53,6 +101,10 @@ class FinancialViewModel(private val repository: FinanceRepository) : ViewModel(
             com.example.orthodoxapp.util.Language.AMHARIC 
         else 
             com.example.orthodoxapp.util.Language.ENGLISH
+    }
+
+    fun setLanguage(language: com.example.orthodoxapp.util.Language) {
+        currentLanguage.value = language
     }
 
     private val _otpState = MutableStateFlow<String?>(null)
@@ -75,20 +127,16 @@ class FinancialViewModel(private val repository: FinanceRepository) : ViewModel(
     }
 
     fun verifyOtp(inputOtp: String): Boolean {
-        // Master override "123456" for testing/emergency connectivity issues
-        return if (inputOtp == _otpState.value || inputOtp == "123456") {
+        return if (inputOtp == _otpState.value) {
             _isOtpVerified.value = true
             true
         } else {
             false
         }
     }
-    
-
         
     val groups: StateFlow<List<ChureGroup>> = repository.allChureGroups
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
-        
 
     val accounts: StateFlow<List<Account>> = repository.allAccounts
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
@@ -112,7 +160,7 @@ class FinancialViewModel(private val repository: FinanceRepository) : ViewModel(
 
     val assets: StateFlow<List<ChurchAsset>> = combine(currentUser, currentRole) { user, role ->
         when (role) {
-            UserRole.SYNOD_ADMIN, UserRole.AUDITOR -> repository.allAssets
+            UserRole.SYNOD_ADMIN -> repository.allAssets
             else -> user?.churchId?.let { repository.getAssetsByChurch(it) } ?: flowOf(emptyList())
         }
     }.flatMapLatest { it }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
@@ -121,16 +169,25 @@ class FinancialViewModel(private val repository: FinanceRepository) : ViewModel(
         user?.id?.let { repository.getNotificationsByUser(it) } ?: flowOf(emptyList())
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-    fun addAsset(name: String, type: String, value: Double, churchId: Long, description: String? = null) {
-        if (name.length < 3) {
-            _actionState.value = ActionState.Error("Asset name is too short")
-            return
-        }
-        if (value <= 0) {
-            _actionState.value = ActionState.Error("Valuation must be greater than zero")
-            return
-        }
+    val certificates: StateFlow<List<Certificate>> = currentUser.flatMapLatest { user ->
+        user?.id?.let { repository.getCertificatesByUser(it) } ?: flowOf(emptyList())
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
+    fun issueCertificate(userId: Long, title: String, awardType: String, description: String? = null) {
+        viewModelScope.launch {
+            _actionState.value = ActionState.Loading
+            try {
+                val churchId = currentUser.value?.churchId ?: 1L
+                val issuerId = currentUser.value?.id ?: 1L
+                repository.addCertificate(userId, churchId, title, awardType, description, issuerId)
+                _actionState.value = ActionState.Success
+            } catch (e: Exception) {
+                _actionState.value = ActionState.Error(e.message ?: "Failed to issue certificate")
+            }
+        }
+    }
+
+    fun addAsset(name: String, type: String, value: Double, churchId: Long, description: String? = null) {
         viewModelScope.launch {
             _actionState.value = ActionState.Loading
             try {
@@ -142,26 +199,25 @@ class FinancialViewModel(private val repository: FinanceRepository) : ViewModel(
         }
     }
 
-
-
-
     init {
         seedInitialData()
         restoreSession()
+        fetchExchangeRates()
     }
 
     private fun restoreSession() {
-        val role = com.example.orthodoxapp.security.SecurityManager.getCurrentRole()
+        val role = SecurityManager.getCurrentRole()
         if (role != null) {
             currentRole.value = role
         }
-        val userId = com.example.orthodoxapp.security.SecurityManager.getStoredUserId()
+        val userId = SecurityManager.getStoredUserId()
         if (userId != -1L) {
             viewModelScope.launch {
                 try {
                     repository.allUsers.first().find { it.id == userId }?.let {
                         currentUser.value = it
                     }
+                    repository.checkInactiveMembers()
                 } catch (_: Exception) {}
             }
         }
@@ -173,7 +229,6 @@ class FinancialViewModel(private val repository: FinanceRepository) : ViewModel(
             val normalizedEmail = email.trim().lowercase()
             val trimmedPassword = passwordRaw.trim()
 
-            // 1. Master Bypass Logic
             val emailCheck = normalizedEmail.replace(" ", "")
             val passCheck = trimmedPassword.lowercase().replace("@", "")
             
@@ -181,8 +236,6 @@ class FinancialViewModel(private val repository: FinanceRepository) : ViewModel(
                 emailCheck == "superadmin@church.com" && passCheck == "super123" -> "synod_admin"
                 emailCheck == "diocese@church.com" && passCheck == "diocese123" -> "diocese_admin"
                 emailCheck == "church@church.com" && passCheck == "church123" -> "church_admin"
-                emailCheck == "accountant@church.com" && passCheck == "accountant123" -> "accountant"
-                emailCheck == "auditor@church.com" && passCheck == "auditor123" -> "auditor"
                 else -> null
             }
 
@@ -191,27 +244,23 @@ class FinancialViewModel(private val repository: FinanceRepository) : ViewModel(
                     "synod_admin" -> 1L
                     "diocese_admin" -> 2L
                     "church_admin" -> 3L
-                    "accountant" -> 4L
-                    "auditor" -> 5L
                     else -> 6L
                 }
 
                 val seededUser = try { repository.getUserByEmail(normalizedEmail) } catch (_: Exception) { null }
                 val user = seededUser ?: User(
-                    id = roleId,
-                    name = when(fallbackRole) {
+                    name = (when(fallbackRole) {
                         "synod_admin" -> "Synod Admin"
                         "diocese_admin" -> "Diocese Admin"
                         "church_admin" -> "Church Administrator"
-                        "accountant" -> "Accountant"
-                        "auditor" -> "Auditor"
                         else -> "Member"
-                    },
+                    }),
                     email = normalizedEmail,
-                    roleId = roleId,
                     passwordHash = PasswordHasher.hashPassword(trimmedPassword),
+                    roleId = roleId,
                     dioceseId = if (roleId == 2L) 1L else null,
-                    churchId = if (roleId in 3L..4L) 1L else null
+                    churchId = if (roleId in 3L..4L) 1L else null,
+                    role = fallbackRole.uppercase()
                 )
 
                 try { repository.registerUser(user) } catch (_: Exception) {}
@@ -219,30 +268,31 @@ class FinancialViewModel(private val repository: FinanceRepository) : ViewModel(
                 return@launch
             }
 
-            // 2. DB Check
             try {
                 val dbUser = repository.getUserByEmail(normalizedEmail)
                 if (dbUser != null) {
                     val hashedInput = PasswordHasher.hashPassword(trimmedPassword)
-                    if (dbUser.passwordHash != hashedInput) {
-                        _loginState.value = LoginState.Error("Invalid password")
+                    if (dbUser.passwordHash == hashedInput) {
+                        loginWithUser(dbUser)
+                        return@launch
+                    } else {
+                        _loginState.value = LoginState.Error("Incorrect password for $normalizedEmail")
                         return@launch
                     }
-                    loginWithUser(dbUser)
-                    return@launch
                 }
-            } catch (_: Exception) {}
+            } catch (e: Exception) {
+                com.example.orthodoxapp.util.ErrorHandler.logError(null, "LOCAL_LOGIN", e, normalizedEmail)
+            }
 
-            // 3. API Login
             try {
                 val result = repository.login(normalizedEmail, trimmedPassword)
                 if (result.isSuccess) {
                     loginWithUser(result.getOrThrow().user)
                 } else {
-                    _loginState.value = LoginState.Error("Account not found.")
+                    _loginState.value = LoginState.Error("Account ($normalizedEmail) not found. Please register first.")
                 }
-            } catch (_: Exception) {
-                _loginState.value = LoginState.Error("Network error.")
+            } catch (e: Exception) {
+                _loginState.value = LoginState.Error("Connection error: ${e.message}")
             }
         }
     }
@@ -253,6 +303,12 @@ class FinancialViewModel(private val repository: FinanceRepository) : ViewModel(
     ) {
         viewModelScope.launch {
             _loginState.value = LoginState.Loading
+            // Prevent public registration of privileged admin roles
+            val prohibitedRoles = setOf("SYNOD_ADMIN", "DIOCESE_ADMIN", "CHURCH_ADMIN")
+            if (roleName.uppercase() in prohibitedRoles) {
+                _loginState.value = LoginState.Error("Public registration for admin roles is not allowed")
+                return@launch
+            }
             val passwordHash = PasswordHasher.hashPassword(passwordRaw)
             val user = User(
                 name = name,
@@ -261,14 +317,48 @@ class FinancialViewModel(private val repository: FinanceRepository) : ViewModel(
                 churchId = churchId,
                 customChurchName = customChurchName,
                 role = roleName.uppercase(),
-                roleId = 6L // Member role ID
+                roleId = 6L
             )
             
             try {
-                val registeredId = repository.registerUser(user)
-                loginWithUser(user.copy(id = registeredId))
+                repository.registerUser(user)
+                _loginState.value = LoginState.Success(user.role ?: "MEMBER")
             } catch (e: Exception) {
                 _loginState.value = LoginState.Error("Registration failed: ${e.message}")
+            }
+        }
+    }
+
+    fun resetPassword(email: String, newPasswordRaw: String) {
+        viewModelScope.launch {
+            if (!_isOtpVerified.value) {
+                _actionState.value = ActionState.Error("OTP not verified")
+                return@launch
+            }
+            _actionState.value = ActionState.Loading
+            try {
+                val dbUser = repository.getUserByEmail(email.trim().lowercase())
+                if (dbUser != null) {
+                    val newHash = PasswordHasher.hashPassword(newPasswordRaw)
+                    repository.updateUser(dbUser.copy(passwordHash = newHash))
+                    _actionState.value = ActionState.Success
+                    _isOtpVerified.value = false // Reset for next time
+                    _otpState.value = null
+                } else {
+                    _actionState.value = ActionState.Error("User not found")
+                }
+            } catch (e: Exception) {
+                _actionState.value = ActionState.Error("Failed to reset password: ${e.message}")
+            }
+        }
+    }
+
+    fun updateUser(user: User) {
+        viewModelScope.launch {
+            try {
+                repository.updateUser(user)
+            } catch (e: Exception) {
+                _actionState.value = ActionState.Error(e.message ?: "Failed to update user")
             }
         }
     }
@@ -281,8 +371,6 @@ class FinancialViewModel(private val repository: FinanceRepository) : ViewModel(
             1L -> "synod_admin"
             2L -> "diocese_admin"
             3L -> "church_admin"
-            4L -> "accountant"
-            5L -> "auditor"
             else -> "member"
         }
         setRole(roleString)
@@ -294,8 +382,6 @@ class FinancialViewModel(private val repository: FinanceRepository) : ViewModel(
             "synod_admin" -> UserRole.SYNOD_ADMIN
             "diocese_admin" -> UserRole.DIOCESE_ADMIN
             "church_admin" -> UserRole.CHURCH_ADMIN
-            "accountant" -> UserRole.ACCOUNTANT
-            "auditor" -> UserRole.AUDITOR
             else -> UserRole.MEMBER
         }
         currentRole.value = newRole
@@ -323,19 +409,20 @@ class FinancialViewModel(private val repository: FinanceRepository) : ViewModel(
         }
     }
 
-    // Data Flows
     val income: StateFlow<List<Income>> = combine(currentUser, currentRole) { user, role ->
         when (role) {
-            UserRole.SYNOD_ADMIN, UserRole.AUDITOR -> repository.allIncome
+            UserRole.SYNOD_ADMIN -> repository.allIncome
             UserRole.DIOCESE_ADMIN -> user?.dioceseId?.let { repository.getIncomeByDiocese(it) } ?: flowOf(emptyList())
+            UserRole.MEMBER -> user?.id?.let { repository.getIncomeByUserId(it) } ?: flowOf(emptyList())
             else -> user?.churchId?.let { repository.getIncomeByChurch(it) } ?: flowOf(emptyList())
         }
     }.flatMapLatest { it }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     val expenses: StateFlow<List<Expense>> = combine(currentUser, currentRole) { user, role ->
         when (role) {
-            UserRole.SYNOD_ADMIN, UserRole.AUDITOR -> repository.allExpenses
+            UserRole.SYNOD_ADMIN -> repository.allExpenses
             UserRole.DIOCESE_ADMIN -> user?.dioceseId?.let { repository.getExpensesByDiocese(it) } ?: flowOf(emptyList())
+            UserRole.MEMBER -> flowOf(emptyList())
             else -> user?.churchId?.let { repository.getExpensesByChurch(it) } ?: flowOf(emptyList())
         }
     }.flatMapLatest { it }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
@@ -343,7 +430,6 @@ class FinancialViewModel(private val repository: FinanceRepository) : ViewModel(
     val dioceses: StateFlow<List<Diocese>> = repository.allDioceses.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
     
     val churches: StateFlow<List<Church>> = combine(currentRole, currentUser) { role, user ->
-        // For registration, we need all churches if no user is logged in
         if (user == null) {
             repository.allChurches
         } else {
@@ -363,32 +449,47 @@ class FinancialViewModel(private val repository: FinanceRepository) : ViewModel(
         }
     }.flatMapLatest { it }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-    // Actions
-    fun addIncome(amount: Double, source: String, accountId: Long, churchId: Long, category: String? = null, description: String? = null, paymentMethod: String? = "Cash") {
-        val ref = "INC-${System.currentTimeMillis().toString().takeLast(8)}"
+    fun addIncome(
+        amount: Double, 
+        source: String, 
+        accountId: Long, 
+        churchId: Long, 
+        category: String? = null, 
+        description: String? = null, 
+        paymentMethod: String? = "Cash", 
+        referenceNumber: String? = null,
+        originalAmount: Double? = null,
+        originalCurrency: String? = "ETB"
+    ) {
+        val ref = referenceNumber ?: "INC-${System.currentTimeMillis().toString().takeLast(8)}"
         viewModelScope.launch { 
+            val targetAccountId = if (accountId == 1L) {
+                repository.getAccountsByChurch(churchId).first().firstOrNull()?.id ?: 1L
+            } else accountId
             repository.addIncome(
-                amount, source, accountId, churchId, 
-                category = category, 
-                userId = currentUser.value?.id ?: 1L, 
-                description = description, 
-                paymentMethod = paymentMethod,
-                referenceNumber = ref
+                amount, 
+                source, 
+                targetAccountId, 
+                churchId, 
+                category ?: "Other", 
+                "PENDING", 
+                currentUser.value?.id ?: 1L, 
+                description, 
+                paymentMethod, 
+                ref,
+                originalAmount,
+                originalCurrency
             ) 
         }
     }
 
-    fun addExpense(amount: Double, recipient: String, accountId: Long, churchId: Long, category: String? = "Other", description: String? = null, paymentMethod: String? = "Cash") {
-        val ref = "EXP-${System.currentTimeMillis().toString().takeLast(8)}"
+    fun addExpense(amount: Double, recipient: String, accountId: Long, churchId: Long, category: String? = "Other", description: String? = null, paymentMethod: String? = "Cash", referenceNumber: String? = null) {
+        val ref = referenceNumber ?: "EXP-${System.currentTimeMillis().toString().takeLast(8)}"
         viewModelScope.launch { 
-            repository.addExpense(
-                amount, recipient, accountId, churchId, 
-                category ?: "Other", 
-                userId = currentUser.value?.id ?: 1L, 
-                description = description, 
-                paymentMethod = paymentMethod,
-                referenceNumber = ref
-            ) 
+            val targetAccountId = if (accountId == 1L) {
+                repository.getAccountsByChurch(churchId).first().firstOrNull()?.id ?: 1L
+            } else accountId
+            repository.addExpense(amount, recipient, targetAccountId, churchId, category ?: "Other", "PENDING", currentUser.value?.id ?: 1L, description, paymentMethod, ref) 
         }
     }
 
@@ -398,42 +499,120 @@ class FinancialViewModel(private val repository: FinanceRepository) : ViewModel(
         }
     }
 
-
-    fun addDiocese(name: String, bishopName: String? = null) {
-        viewModelScope.launch { repository.addDiocese(name, bishopName) }
-    }
-
-    fun addChurch(name: String, location: String, dioceseId: Long, adminName: String? = null, adminEmail: String? = null) {
+    fun addDiocese(name: String, location: String? = null, bishopName: String? = null, adminName: String? = null, adminEmail: String? = null, adminPassword: String? = null) {
         viewModelScope.launch { 
-            val churchId = repository.addChurch(name, location, dioceseId)
-            
-            // Auto-assign admin if provided
-            if (!adminName.isNullOrBlank() && !adminEmail.isNullOrBlank()) {
-                val passwordHash = com.example.orthodoxapp.security.PasswordHasher.hashPassword("church123") // Default password
-                repository.registerUser(User(
-                    name = adminName,
-                    email = adminEmail.trim().lowercase(),
+            try {
+                _actionState.value = ActionState.Loading
+                val cleanName = name.trim()
+                val actualAdminEmail = if (adminEmail.isNullOrBlank()) 
+                    "admin.${cleanName.replace(" ", ".").replace("'", "").lowercase()}@church.com" 
+                    else adminEmail.trim().lowercase()
+                
+                val passwordHash = PasswordHasher.hashPassword(if (adminPassword.isNullOrBlank()) "diocese123" else adminPassword)
+                val adminUser = User(
+                    name = adminName ?: "Admin of $cleanName",
+                    email = actualAdminEmail,
                     passwordHash = passwordHash,
-                    churchId = churchId,
-                    dioceseId = dioceseId,
-                    role = "CHURCH_ADMIN",
-                    roleId = 3L
-                ))
+                    role = "DIOCESE_ADMIN",
+                    roleId = 2L,
+                    status = "ACTIVE"
+                )
+                repository.addOrganizationWithAdmin("Diocese", cleanName, location ?: "", null, adminUser)
+                _actionState.value = ActionState.Success
+            } catch (e: Exception) {
+                _actionState.value = ActionState.Error(e.message ?: "Failed to add diocese")
             }
         }
     }
+
+    fun addChurch(name: String, location: String, dioceseId: Long, adminName: String? = null, adminEmail: String? = null, adminPassword: String? = null) {
+        viewModelScope.launch {
+            _actionState.value = ActionState.Loading
+            try {
+                val cleanName = name.trim()
+                val actualAdminEmail = if (adminEmail.isNullOrBlank())
+                    "admin.${cleanName.replace(" ", ".").replace("'", "").lowercase()}@church.com"
+                    else adminEmail.trim().lowercase()
+                
+                val passwordHash = PasswordHasher.hashPassword(if (adminPassword.isNullOrBlank()) "church123" else adminPassword)
+                val adminUser = User(
+                    name = adminName ?: "Admin of $cleanName",
+                    email = actualAdminEmail,
+                    passwordHash = passwordHash,
+                    role = "CHURCH_ADMIN",
+                    roleId = 3L,
+                    dioceseId = dioceseId,
+                    status = "ACTIVE"
+                )
+                repository.addOrganizationWithAdmin("Church", cleanName, location, dioceseId, adminUser)
+                _actionState.value = ActionState.Success
+            } catch (e: Exception) {
+                _actionState.value = ActionState.Error(e.message ?: "Failed to add church")
+            }
+        }
+    }
+
+    fun addDioceseWithChurchAndAdmin(
+        dioceseName: String,
+        dioceseLocation: String?,
+        churchName: String,
+        churchLocation: String?,
+        adminName: String? = null,
+        adminEmail: String? = null,
+        adminPassword: String? = null
+    ) {
+        viewModelScope.launch {
+            _actionState.value = ActionState.Loading
+            try {
+                val cleanDioceseName = dioceseName.trim()
+                val actualAdminEmail = if (adminEmail.isNullOrBlank())
+                    "admin.${cleanDioceseName.replace(" ", ".").replace("'", "").lowercase()}@church.com"
+                    else adminEmail.trim().lowercase()
+
+                val passwordHash = PasswordHasher.hashPassword(if (adminPassword.isNullOrBlank()) "diocese123" else adminPassword)
+                val adminUser = User(
+                    name = adminName ?: "Admin of $cleanDioceseName",
+                    email = actualAdminEmail,
+                    passwordHash = passwordHash,
+                    role = "CHURCH_ADMIN",
+                    roleId = 3L,
+                    status = "ACTIVE"
+                )
+                repository.addDioceseWithChurchAndAdmin(
+                    dioceseName = cleanDioceseName,
+                    dioceseLocation = dioceseLocation,
+                    churchName = churchName,
+                    churchLocation = churchLocation,
+                    admin = adminUser
+                )
+                _actionState.value = ActionState.Success
+            } catch (e: Exception) {
+                _actionState.value = ActionState.Error(e.message ?: "Failed to add combined diocese/church")
+            }
+        }
+    }
+
 
     fun addUser(name: String, email: String, roleId: Long, churchId: Long? = null, dioceseId: Long? = null) {
         viewModelScope.launch {
             val user = User(
                 name = name,
                 email = email,
-                roleId = roleId,
+                passwordHash = PasswordHasher.hashPassword("default123"),
                 churchId = churchId,
                 dioceseId = dioceseId,
-                passwordHash = com.example.orthodoxapp.security.PasswordHasher.hashPassword("Default@123")
+                role = getRoleFromId(roleId).name,
+                roleId = roleId
             )
             repository.registerUser(user)
+        }
+    }
+
+    fun pushAnnouncement(title: String, message: String) {
+        viewModelScope.launch {
+            currentUser.value?.churchId?.let { churchId ->
+                repository.pushNotificationToChurch(churchId, title, message, "ALERT")
+            }
         }
     }
 
@@ -479,23 +658,26 @@ class FinancialViewModel(private val repository: FinanceRepository) : ViewModel(
         1L -> UserRole.SYNOD_ADMIN
         2L -> UserRole.DIOCESE_ADMIN
         3L -> UserRole.CHURCH_ADMIN
-        4L -> UserRole.ACCOUNTANT
-        5L -> UserRole.AUDITOR
         else -> UserRole.MEMBER
     }
 
     fun addChurchAdmin(churchId: Long, name: String, email: String) {
         viewModelScope.launch {
-            val passwordHash = com.example.orthodoxapp.security.PasswordHasher.hashPassword("church123")
-            repository.registerUser(User(
-                name = name,
-                email = email.trim().lowercase(),
-                passwordHash = passwordHash,
-                churchId = churchId,
-                role = "CHURCH_ADMIN",
-                roleId = 3L
-            ))
-            _actionState.value = ActionState.Success
+            try {
+                val actualName = if (name.isBlank()) "Church Admin" else name
+                val passwordHash = PasswordHasher.hashPassword("church123")
+                repository.registerUser(User(
+                    name = actualName,
+                    email = email.trim().lowercase(),
+                    passwordHash = passwordHash,
+                    churchId = churchId,
+                    role = "CHURCH_ADMIN",
+                    roleId = 3L
+                ))
+                _actionState.value = ActionState.Success
+            } catch (e: Exception) {
+                _actionState.value = ActionState.Error("Failed to assign admin: ${e.message}")
+            }
         }
     }
 }

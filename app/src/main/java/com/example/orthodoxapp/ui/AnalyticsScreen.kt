@@ -55,8 +55,8 @@ fun AnalyticsScreen(viewModel: FinancialViewModel, onBack: () -> Unit) {
                 ) {
                     Box(modifier = Modifier.padding(16.dp).fillMaxSize(), contentAlignment = Alignment.BottomCenter) {
                         SimpleBarChart(
-                            data = listOf(0.3f, 0.5f, 0.7f, 0.4f, 0.8f, 0.6f),
-                            labels = listOf("Jan", "Feb", "Mar", "Apr", "May", "Jun"),
+                            data = listOf(0.3f, 0.4f, 0.5f, 0.7f, 0.4f, 0.8f, 0.6f, 0.9f, 0.7f, 0.8f, 0.6f, 0.9f),
+                            labels = listOf("Sep", "Oct", "Nov", "Dec", "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug"),
                             barColor = PrimaryBlue
                         )
                     }

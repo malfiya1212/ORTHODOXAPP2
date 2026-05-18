@@ -28,7 +28,7 @@ import android.widget.Toast
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
 import coil.compose.AsyncImage
-import com.example.orthodoxapp.data.model.UserRole
+import com.example.orthodoxapp.data.model.*
 import com.example.orthodoxapp.ui.theme.*
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -38,9 +38,21 @@ fun RecordIncomeScreen(viewModel: FinancialViewModel, onBack: () -> Unit) {
     val isMember = currentRole == UserRole.MEMBER
 
     var amount by remember { mutableStateOf("") }
+    val liveRates by viewModel.exchangeRates.collectAsState()
+    val currencies = remember(liveRates) {
+        listOf(
+            com.example.orthodoxapp.data.model.Currency("ETB", "🇪🇹", 1.0),
+            com.example.orthodoxapp.data.model.Currency("USD", "🇺🇸", liveRates["USD"] ?: 124.50),
+            com.example.orthodoxapp.data.model.Currency("EUR", "🇪🇺", liveRates["EUR"] ?: 132.80),
+            com.example.orthodoxapp.data.model.Currency("GBP", "🇬🇧", liveRates["GBP"] ?: 156.20)
+        )
+    }
+    var selectedCurrency by remember(currencies) { mutableStateOf<com.example.orthodoxapp.data.model.Currency>(currencies.first()) }
+    
     var source by remember { mutableStateOf("") }
     var selectedCategory by remember { mutableStateOf("Tithe") }
     var paymentMethod by remember { mutableStateOf("Cash") }
+    var referenceNumber by remember { mutableStateOf("REC-${System.currentTimeMillis().toString().takeLast(6)}") }
     var description by remember { mutableStateOf("") }
     var expanded by remember { mutableStateOf(false) }
     var methodExpanded by remember { mutableStateOf(false) }
@@ -109,18 +121,53 @@ fun RecordIncomeScreen(viewModel: FinancialViewModel, onBack: () -> Unit) {
             }
 
             // Amount Input
-            Column {
-                Text("Amount in ETB", fontWeight = FontWeight.Bold, fontSize = 14.sp, color = TextSecondary)
-                Spacer(Modifier.height(8.dp))
-                OutlinedTextField(
-                    value = amount,
-                    onValueChange = { amount = it },
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(16.dp),
-                    placeholder = { Text("0.00") },
-                    leadingIcon = { Icon(Icons.Default.Payments, contentDescription = null, tint = OrthodoxBlue) },
-                    colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = OrthodoxBlue)
-                )
+            Row(horizontalArrangement = Arrangement.spacedBy(16.dp), verticalAlignment = Alignment.CenterVertically) {
+                Column(modifier = Modifier.weight(0.4f)) {
+                    Text("Currency", fontWeight = FontWeight.Bold, fontSize = 14.sp, color = TextSecondary)
+                    Spacer(Modifier.height(8.dp))
+                    var currencyExpanded by remember { mutableStateOf(false) }
+                    ExposedDropdownMenuBox(
+                        expanded = currencyExpanded,
+                        onExpandedChange = { currencyExpanded = !currencyExpanded }
+                    ) {
+                        OutlinedTextField(
+                            value = "${selectedCurrency.flag} ${selectedCurrency.code}",
+                            onValueChange = { _ -> },
+                            readOnly = true,
+                            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = currencyExpanded) },
+                            modifier = Modifier.fillMaxWidth().menuAnchor(MenuAnchorType.PrimaryNotEditable),
+                            shape = RoundedCornerShape(16.dp),
+                            colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = OrthodoxBlue)
+                        )
+                        ExposedDropdownMenu(expanded = currencyExpanded, onDismissRequest = { currencyExpanded = false }) {
+                            currencies.forEach { c ->
+                                DropdownMenuItem(text = { Text("${c.flag} ${c.code}") }, onClick = { selectedCurrency = c; currencyExpanded = false })
+                            }
+                        }
+                    }
+                }
+                Column(modifier = Modifier.weight(0.6f)) {
+                    val enteredAmt = amount.toDoubleOrNull() ?: 0.0
+                    Text("Amount (${selectedCurrency.code})", fontWeight = FontWeight.Bold, fontSize = 14.sp, color = TextSecondary)
+                    Spacer(Modifier.height(8.dp))
+                    OutlinedTextField(
+                        value = amount,
+                        onValueChange = { amount = it },
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(16.dp),
+                        placeholder = { Text("0.00") },
+                        leadingIcon = { Icon(Icons.Default.Payments, contentDescription = null, tint = OrthodoxBlue) },
+                        colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = OrthodoxBlue),
+                        keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = androidx.compose.ui.text.input.KeyboardType.Number)
+                    )
+                    if (selectedCurrency.code != "ETB" && enteredAmt > 0) {
+                        Text(
+                            "≈ ETB ${String.format("%,.2f", enteredAmt * selectedCurrency.rateToEtb)}",
+                            fontSize = 11.sp, color = SuccessGreen, fontWeight = FontWeight.Bold,
+                            modifier = Modifier.padding(top = 4.dp, start = 4.dp)
+                        )
+                    }
+                }
             }
 
             // Source Input
@@ -153,10 +200,10 @@ fun RecordIncomeScreen(viewModel: FinancialViewModel, onBack: () -> Unit) {
                 ) {
                     OutlinedTextField(
                         value = selectedCategory,
-                        onValueChange = {},
+                        onValueChange = { _ -> },
                         readOnly = true,
                         trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
-                        modifier = Modifier.fillMaxWidth().menuAnchor(MenuAnchorType.PrimaryNotEditable, enabled = true),
+                        modifier = Modifier.fillMaxWidth().menuAnchor(MenuAnchorType.PrimaryNotEditable),
                         shape = RoundedCornerShape(16.dp),
                         leadingIcon = { Icon(Icons.AutoMirrored.Filled.Label, contentDescription = null, tint = OrthodoxBlue) },
                         colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = OrthodoxBlue)
@@ -189,10 +236,10 @@ fun RecordIncomeScreen(viewModel: FinancialViewModel, onBack: () -> Unit) {
                 ) {
                     OutlinedTextField(
                         value = paymentMethod,
-                        onValueChange = {},
+                        onValueChange = { _ -> },
                         readOnly = true,
                         trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = methodExpanded) },
-                        modifier = Modifier.fillMaxWidth().menuAnchor(MenuAnchorType.PrimaryNotEditable, enabled = true),
+                        modifier = Modifier.fillMaxWidth().menuAnchor(MenuAnchorType.PrimaryNotEditable),
                         shape = RoundedCornerShape(16.dp),
                         leadingIcon = { Icon(Icons.Default.Payment, contentDescription = null, tint = OrthodoxBlue) },
                         colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = OrthodoxBlue)
@@ -225,11 +272,11 @@ fun RecordIncomeScreen(viewModel: FinancialViewModel, onBack: () -> Unit) {
                     ) {
                         OutlinedTextField(
                             value = selectedBank,
-                            onValueChange = {},
+                            onValueChange = { _ -> },
                             readOnly = true,
                             placeholder = { Text("Choose Ethiopian Bank") },
                             trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = bankExpanded) },
-                            modifier = Modifier.fillMaxWidth().menuAnchor(MenuAnchorType.PrimaryNotEditable, enabled = true),
+                            modifier = Modifier.fillMaxWidth().menuAnchor(MenuAnchorType.PrimaryNotEditable),
                             shape = RoundedCornerShape(16.dp),
                             leadingIcon = { Icon(Icons.Default.AccountBalance, contentDescription = null, tint = OrthodoxBlue) },
                             colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = OrthodoxBlue)
@@ -263,11 +310,11 @@ fun RecordIncomeScreen(viewModel: FinancialViewModel, onBack: () -> Unit) {
                     ) {
                         OutlinedTextField(
                             value = selectedMobilePlatform,
-                            onValueChange = {},
+                            onValueChange = { _ -> },
                             readOnly = true,
                             placeholder = { Text("Choose Mobile Service") },
                             trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = mobileExpanded) },
-                            modifier = Modifier.fillMaxWidth().menuAnchor(MenuAnchorType.PrimaryNotEditable, enabled = true),
+                            modifier = Modifier.fillMaxWidth().menuAnchor(MenuAnchorType.PrimaryNotEditable),
                             shape = RoundedCornerShape(16.dp),
                             leadingIcon = { Icon(Icons.Default.Smartphone, contentDescription = null, tint = OrthodoxBlue) },
                             colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = OrthodoxBlue)
@@ -291,18 +338,47 @@ fun RecordIncomeScreen(viewModel: FinancialViewModel, onBack: () -> Unit) {
             }
 
             // Date Selection
+            var showDatePicker by remember { mutableStateOf(false) }
+            val datePickerState = rememberDatePickerState(initialSelectedDateMillis = System.currentTimeMillis())
+            val formattedDate = remember(datePickerState.selectedDateMillis) {
+                val millis = datePickerState.selectedDateMillis ?: System.currentTimeMillis()
+                java.text.SimpleDateFormat("dd MMM yyyy", java.util.Locale.getDefault()).format(java.util.Date(millis))
+            }
+
+            if (showDatePicker) {
+                DatePickerDialog(
+                    onDismissRequest = { showDatePicker = false },
+                    confirmButton = {
+                        TextButton(onClick = { showDatePicker = false }) { Text("OK") }
+                    },
+                    dismissButton = {
+                        TextButton(onClick = { showDatePicker = false }) { Text("Cancel") }
+                    }
+                ) {
+                    DatePicker(state = datePickerState)
+                }
+            }
+
             Column {
                 Text("Date", fontWeight = FontWeight.Bold, fontSize = 14.sp, color = TextSecondary)
                 Spacer(Modifier.height(8.dp))
-                OutlinedTextField(
-                    value = "Today's Date", // Placeholder for actual picker
-                    onValueChange = {},
-                    readOnly = true,
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(16.dp),
-                    leadingIcon = { Icon(Icons.Default.CalendarToday, contentDescription = null, tint = OrthodoxBlue) },
-                    colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = OrthodoxBlue)
-                )
+                Box(modifier = Modifier.fillMaxWidth().clickable { showDatePicker = true }) {
+                    OutlinedTextField(
+                        value = formattedDate,
+                        onValueChange = { _ -> },
+                        readOnly = true,
+                        modifier = Modifier.fillMaxWidth(),
+                        enabled = false, // Disabled to prevent keyboard, but click is handled by Box
+                        shape = RoundedCornerShape(16.dp),
+                        leadingIcon = { Icon(Icons.Default.CalendarToday, contentDescription = null, tint = OrthodoxBlue) },
+                        colors = OutlinedTextFieldDefaults.colors(
+                            disabledBorderColor = OrthodoxBlue,
+                            disabledTextColor = TextPrimary,
+                            disabledLeadingIconColor = OrthodoxBlue,
+                            disabledPlaceholderColor = TextSecondary
+                        )
+                    )
+                }
             }
 
             // Description
@@ -320,51 +396,59 @@ fun RecordIncomeScreen(viewModel: FinancialViewModel, onBack: () -> Unit) {
                 )
             }
 
-            // Receipt Upload Section
-            Text("Proof of Payment (Optional)", fontWeight = FontWeight.Bold, fontSize = 14.sp, color = TextSecondary)
-            Surface(
-                modifier = Modifier.fillMaxWidth().clickable { imagePickerLauncher.launch("image/*") },
-                shape = RoundedCornerShape(20.dp),
-                color = SurfaceWhite,
-                border = androidx.compose.foundation.BorderStroke(1.dp, Color.LightGray.copy(alpha = 0.5f))
-            ) {
-                Column(
-                    modifier = Modifier.padding(32.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ) {
-                    if (selectedImageUri != null) {
-                        AsyncImage(
-                            model = selectedImageUri,
-                            contentDescription = "Selected Receipt",
-                            modifier = Modifier.height(150.dp).fillMaxWidth().clip(RoundedCornerShape(12.dp))
-                        )
-                    } else {
-                        Icon(Icons.Default.AddAPhoto, contentDescription = null, modifier = Modifier.size(48.dp), tint = OrthodoxBlue.copy(alpha = 0.4f))
-                        Spacer(Modifier.height(12.dp))
-                        Text("Tap to upload receipt", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = OrthodoxBlue)
-                        Text("JPG, PNG or PDF supported", fontSize = 11.sp, color = TextSecondary)
-                    }
-                }
+            // Reference Number
+            Column {
+                Text("Reference / Receipt Number", fontWeight = FontWeight.Bold, fontSize = 14.sp, color = TextSecondary)
+                Spacer(Modifier.height(8.dp))
+                OutlinedTextField(
+                    value = referenceNumber,
+                    onValueChange = { referenceNumber = it },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(16.dp),
+                    placeholder = { Text("Enter Reference (Mandatory)") },
+                    leadingIcon = { Icon(Icons.Default.Numbers, contentDescription = null, tint = OrthodoxGold) },
+                    colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = OrthodoxBlue)
+                )
+                Text("All entries must include a verifiable reference ID.", fontSize = 11.sp, color = TextSecondary, modifier = Modifier.padding(top = 4.dp))
             }
 
             Spacer(Modifier.height(12.dp))
 
             Button(
                 onClick = {
-                    if (amount.isEmpty() || source.isEmpty()) {
-                        Toast.makeText(context, "Please fill all fields", Toast.LENGTH_SHORT).show()
+                    if (amount.isEmpty() || source.isEmpty() || referenceNumber.isEmpty()) {
+                        Toast.makeText(context, "Please fill all fields including Reference", Toast.LENGTH_SHORT).show()
                     } else {
-                        val amt = amount.toDoubleOrNull() ?: 0.0
-                        if (amt <= 0) {
+                        val amtRaw = amount.toDoubleOrNull() ?: 0.0
+                        if (amtRaw <= 0) {
                             Toast.makeText(context, "Invalid amount", Toast.LENGTH_SHORT).show()
                         } else {
+                            val finalAmount = if (selectedCurrency.code == "ETB") amtRaw else amtRaw * selectedCurrency.rateToEtb
                             val finalMethod = when (paymentMethod) {
                                 "Bank Transfer" -> if (selectedBank.isNotEmpty()) "Bank ($selectedBank)" else "Bank Transfer"
                                 "Mobile Banking" -> if (selectedMobilePlatform.isNotEmpty()) "Mobile ($selectedMobilePlatform)" else "Mobile Banking"
                                 else -> paymentMethod
                             }
-                            viewModel.addIncome(amt, source, 1L, 1L, selectedCategory, description, finalMethod)
-                            Toast.makeText(context, "Successfully Recorded", Toast.LENGTH_LONG).show()
+                            val currentUser = viewModel.currentUser.value
+                            val churchId = currentUser?.churchId ?: 1L
+                            
+                            val finalDescription = if (selectedCurrency.code != "ETB") {
+                                "$description (Original: $amtRaw ${selectedCurrency.code})"
+                            } else description
+
+                            viewModel.addIncome(
+                                amount = finalAmount,
+                                source = source,
+                                accountId = 1L,
+                                churchId = churchId,
+                                category = selectedCategory,
+                                description = finalDescription,
+                                paymentMethod = finalMethod,
+                                referenceNumber = referenceNumber,
+                                originalAmount = amtRaw,
+                                originalCurrency = selectedCurrency.code
+                            )
+                            Toast.makeText(context, "Successfully Recorded! Ref: $referenceNumber", Toast.LENGTH_LONG).show()
                             onBack()
                         }
                     }

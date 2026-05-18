@@ -109,11 +109,11 @@ fun AddAssetDialog(onDismiss: () -> Unit, onConfirm: (String, String, Double, St
                 ExposedDropdownMenuBox(expanded = expanded, onExpandedChange = { expanded = !expanded }) {
                     OutlinedTextField(
                         value = type,
-                        onValueChange = {},
+                        onValueChange = { _ -> },
                         readOnly = true,
                         label = { Text("Asset Category") },
                         trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
-                        modifier = Modifier.fillMaxWidth().menuAnchor(type = MenuAnchorType.PrimaryNotEditable, enabled = true)
+                        modifier = Modifier.fillMaxWidth().menuAnchor(MenuAnchorType.PrimaryNotEditable)
                     )
                     ExposedDropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
                         types.forEach { t ->

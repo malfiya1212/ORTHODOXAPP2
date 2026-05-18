@@ -25,7 +25,7 @@ import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ChureScreen(viewModel: FinancialViewModel, onBack: () -> Unit = {}, modifier: Modifier = Modifier) {
+fun ChureScreen(viewModel: FinancialViewModel, onBack: () -> Unit = {}, onNavigate: (String) -> Unit = {}, modifier: Modifier = Modifier) {
     val groups by viewModel.groups.collectAsState()
     val currentUser by viewModel.currentUser.collectAsState()
     val currentRole by viewModel.currentRole.collectAsState()
@@ -91,7 +91,7 @@ fun ChureScreen(viewModel: FinancialViewModel, onBack: () -> Unit = {}, modifier
                 }
             } else {
                 items(groups) { group ->
-                    ChureGroupCard(group = group, isMember = isMember, onRecordPayment = { /* TODO */ })
+                    ChureGroupCard(group = group, isMember = isMember, onRecordPayment = { onNavigate("global_payment") })
                 }
             }
         }
@@ -128,11 +128,11 @@ fun AddChureGroupDialog(onDismiss: () -> Unit, onConfirm: (String, Double, Strin
                 ExposedDropdownMenuBox(expanded = expanded, onExpandedChange = { expanded = !expanded }) {
                     OutlinedTextField(
                         value = frequency,
-                        onValueChange = {},
+                        onValueChange = { _ -> },
                         readOnly = true,
                         label = { Text("Frequency") },
                         trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
-                        modifier = Modifier.fillMaxWidth().menuAnchor(type = MenuAnchorType.PrimaryNotEditable, enabled = true)
+                        modifier = Modifier.fillMaxWidth().menuAnchor(MenuAnchorType.PrimaryNotEditable)
                     )
                     ExposedDropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
                         frequencies.forEach { f ->

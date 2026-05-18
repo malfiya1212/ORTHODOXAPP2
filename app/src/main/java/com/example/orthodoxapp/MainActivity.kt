@@ -65,17 +65,31 @@ class MainActivity : ComponentActivity() {
             val database = AppDatabase.getDatabase(applicationContext)
             com.example.orthodoxapp.util.ErrorHandler.initialize(database.financeDao())
             
-            val repository = FinanceRepository(database, database.financeDao(), database.syncDao(), NetworkClient.apiService)
+            val repository = FinanceRepository(database, database.financeDao(), database.syncDao(), NetworkClient.apiService, NetworkClient.exchangeRateApiService)
             val viewModel = FinancialViewModel(repository)
             
             enableEdgeToEdge()
             setContent {
                 val isDarkMode by viewModel.isDarkMode.collectAsState()
                 val currentLanguage by viewModel.currentLanguage.collectAsState()
-                val strings = if (currentLanguage == com.example.orthodoxapp.util.Language.AMHARIC) 
-                    com.example.orthodoxapp.util.AmharicStrings 
-                else 
-                    com.example.orthodoxapp.util.EnglishStrings
+                val strings = when (currentLanguage) {
+                    com.example.orthodoxapp.util.Language.AMHARIC -> com.example.orthodoxapp.util.AmharicStrings
+                    com.example.orthodoxapp.util.Language.OROMOO -> com.example.orthodoxapp.util.OromooStrings
+                    com.example.orthodoxapp.util.Language.TIGRINYA -> com.example.orthodoxapp.util.TigrinyaStrings
+                    com.example.orthodoxapp.util.Language.GEEZ -> com.example.orthodoxapp.util.GeezStrings
+                    com.example.orthodoxapp.util.Language.SOMALI -> com.example.orthodoxapp.util.SomaliStrings
+                    com.example.orthodoxapp.util.Language.AFAR -> com.example.orthodoxapp.util.AfarStrings
+                    com.example.orthodoxapp.util.Language.SIDAMO -> com.example.orthodoxapp.util.SidamoStrings
+                    com.example.orthodoxapp.util.Language.WOLAYTTA -> com.example.orthodoxapp.util.WolayttaStrings
+                    com.example.orthodoxapp.util.Language.GURAGE -> com.example.orthodoxapp.util.GurageStrings
+                    com.example.orthodoxapp.util.Language.HADIYISA -> com.example.orthodoxapp.util.HadiyisaStrings
+                    com.example.orthodoxapp.util.Language.GAMO -> com.example.orthodoxapp.util.GamoStrings
+                    com.example.orthodoxapp.util.Language.KAFA -> com.example.orthodoxapp.util.KafaStrings
+                    com.example.orthodoxapp.util.Language.AGEW -> com.example.orthodoxapp.util.AgewStrings
+                    com.example.orthodoxapp.util.Language.BERTA -> com.example.orthodoxapp.util.BertaStrings
+                    com.example.orthodoxapp.util.Language.ANYUAK -> com.example.orthodoxapp.util.AnyuakStrings
+                    else -> com.example.orthodoxapp.util.EnglishStrings
+                }
 
                 ORTHODOXAPPTheme(darkTheme = isDarkMode) {
                     androidx.compose.runtime.CompositionLocalProvider(
@@ -96,8 +110,6 @@ class MainActivity : ComponentActivity() {
                                     UserRole.SYNOD_ADMIN -> Screen.SynodDashboard
                                     UserRole.DIOCESE_ADMIN -> Screen.DioceseDashboard
                                     UserRole.CHURCH_ADMIN -> Screen.ChurchDashboard
-                                    UserRole.ACCOUNTANT -> Screen.AccountantDashboard
-                                    UserRole.AUDITOR -> Screen.AuditorDashboard
                                     else -> Screen.Dashboard
                                 }, 
                                 strings.dashboard, 
@@ -112,7 +124,7 @@ class MainActivity : ComponentActivity() {
                                 baseItems.add(Triple(Screen.Profile, "Profile", Icons.Default.Person))
                             }
                             UserRole.DIOCESE_ADMIN -> {
-                                baseItems.add(Triple(Screen.OrgManagement, "Churches", Icons.Default.Church))
+                                baseItems.add(Triple(Screen.OrgManagement, "Churches", Icons.Default.AccountBalance))
                                 baseItems.add(Triple(Screen.Approvals, "Approvals", Icons.AutoMirrored.Filled.FactCheck))
                                 baseItems.add(Triple(Screen.Reports, "Reports", Icons.Default.Assessment))
                                 baseItems.add(Triple(Screen.Profile, "Profile", Icons.Default.Person))
@@ -157,7 +169,9 @@ class MainActivity : ComponentActivity() {
                                             label = { Text(label, maxLines = 1) },
                                             selected = currentDestination?.hierarchy?.any { it.route == screen.route } == true,
                                             onClick = {
-                                                navController.navigate(screen.route) {
+                                                val routeToNavigate = screen.route.substringBefore("/")
+                                                    .substringBefore("?")
+                                                navController.navigate(routeToNavigate) {
                                                     popUpTo(navController.graph.findStartDestination().id) {
                                                         saveState = true
                                                     }
@@ -191,7 +205,7 @@ class MainActivity : ComponentActivity() {
                             verticalArrangement = Arrangement.Center,
                             horizontalAlignment = Alignment.CenterHorizontally
                         ) {
-                            Icon(Icons.Default.Error, contentDescription = null, tint = Color.White, modifier = Modifier.size(64.dp))
+                            Icon(Icons.Default.Warning, contentDescription = null, tint = Color.White, modifier = Modifier.size(64.dp))
                             Spacer(Modifier.height(24.dp))
                             Text("Critical Startup Error", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 24.sp)
                             Spacer(Modifier.height(16.dp))

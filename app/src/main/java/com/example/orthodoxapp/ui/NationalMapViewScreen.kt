@@ -68,7 +68,7 @@ fun NationalMapViewScreen(viewModel: FinancialViewModel, onBack: () -> Unit) {
             modifier = Modifier.fillMaxSize(),
             cameraPositionState = cameraPositionState,
             properties = MapProperties(
-                isMyLocationEnabled = true, // Shows the blue dot
+                isMyLocationEnabled = false,
                 mapType = MapType.NORMAL,
                 isTrafficEnabled = false
             ),
@@ -89,7 +89,9 @@ fun NationalMapViewScreen(viewModel: FinancialViewModel, onBack: () -> Unit) {
 
             churches.forEach { church ->
                 if (church.latitude != null && church.longitude != null) {
-                    val position = LatLng(church.latitude!!, church.longitude!!)
+                    val lat = church.latitude ?: 9.0
+                    val lng = church.longitude ?: 38.0
+                    val position = LatLng(lat, lng)
                     Marker(
                         state = MarkerState(position = position),
                         title = church.name,
@@ -154,12 +156,14 @@ fun NationalMapViewScreen(viewModel: FinancialViewModel, onBack: () -> Unit) {
                             if (filter == "Nearest" && churches.isNotEmpty()) {
                                 // Find nearest church
                                 val nearest = churches.filter { it.latitude != null && it.longitude != null }
-                                    .minByOrNull { getDistance(userLocation.latitude, userLocation.longitude, it.latitude!!, it.longitude!!) }
+                                    .minByOrNull { getDistance(userLocation.latitude, userLocation.longitude, it.latitude ?: 0.0, it.longitude ?: 0.0) }
                                 if (nearest != null) {
+                                    val lat = nearest.latitude ?: 9.0
+                                    val lng = nearest.longitude ?: 38.0
                                     selectedChurch = nearest
                                     viewModel.viewModelScope.launch {
                                         cameraPositionState.animate(
-                                            update = CameraUpdateFactory.newLatLngZoom(LatLng(nearest.latitude!!, nearest.longitude!!), 14f),
+                                            update = CameraUpdateFactory.newLatLngZoom(LatLng(lat, lng), 14f),
                                             durationMs = 1000
                                         )
                                     }
@@ -278,7 +282,7 @@ fun NationalMapViewScreen(viewModel: FinancialViewModel, onBack: () -> Unit) {
                                 Icon(Icons.Default.AccessTime, contentDescription = null, tint = Color.Gray, modifier = Modifier.size(16.dp))
                                 Spacer(Modifier.width(4.dp))
                                 val dist = if (selectedChurch?.latitude != null && selectedChurch?.longitude != null) {
-                                    getDistance(userLocation.latitude, userLocation.longitude, selectedChurch!!.latitude!!, selectedChurch!!.longitude!!)
+                                    getDistance(userLocation.latitude, userLocation.longitude, selectedChurch?.latitude ?: 0.0, selectedChurch?.longitude ?: 0.0)
                                 } else 0.0
                                 Text("${String.format("%.1f", dist)} km away", color = Color.Gray, fontSize = 12.sp)
                             }

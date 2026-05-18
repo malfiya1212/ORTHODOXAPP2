@@ -21,10 +21,9 @@ sealed class Screen(val route: String) {
     object SynodDashboard : Screen("synod_dashboard")
     object DioceseDashboard : Screen("diocese_dashboard?id={id}") {
         fun createRoute(id: Long) = "diocese_dashboard?id=$id"
+        val baseRoute = "diocese_dashboard"
     }
     object ChurchDashboard : Screen("church_dashboard")
-    object AccountantDashboard : Screen("accountant_dashboard")
-    object AuditorDashboard : Screen("auditor_dashboard")
     object Dashboard : Screen("dashboard") // Default/Member
     object Income : Screen("income")
     object AddIncome : Screen("add_income")
@@ -51,6 +50,8 @@ sealed class Screen(val route: String) {
     object Projects : Screen("projects")
     object Treasury : Screen("treasury")
     object Members : Screen("members")
+    object Certificates : Screen("certificates")
+    object Language : Screen("language")
     object Receipt : Screen("receipt/{type}/{id}") {
         fun createRoute(type: String, id: Long) = "receipt/$type/$id"
     }
@@ -96,7 +97,7 @@ fun NavGraph(
             RegistrationScreen(
                 viewModel = viewModel,
                 onRegisterSuccess = {
-                    navController.navigate(Screen.Dashboard.route) {
+                    navController.navigate(Screen.Login.route) {
                         popUpTo(Screen.Register.route) { inclusive = true }
                     }
                 },
@@ -123,7 +124,7 @@ fun NavGraph(
         }
 
         composable(
-            Screen.DioceseDashboard.route,
+            "diocese_dashboard?id={id}",
             arguments = listOf(navArgument("id") { defaultValue = "" })
         ) { backStackEntry ->
             val dioceseId = backStackEntry.arguments?.getString("id")?.toLongOrNull()
@@ -132,7 +133,7 @@ fun NavGraph(
             }
         }
         composable(Screen.Reports.route) {
-            ProtectedRoute(navController, viewModel, listOf(UserRole.SYNOD_ADMIN, UserRole.DIOCESE_ADMIN, UserRole.CHURCH_ADMIN, UserRole.AUDITOR)) {
+            ProtectedRoute(navController, viewModel, listOf(UserRole.SYNOD_ADMIN, UserRole.DIOCESE_ADMIN, UserRole.CHURCH_ADMIN)) {
                 ReportsScreen(viewModel, onBack = { navController.popBackStack() })
             }
         }
@@ -142,13 +143,13 @@ fun NavGraph(
             }
         }
         composable(Screen.Assets.route) {
-            ProtectedRoute(navController, viewModel, listOf(UserRole.SYNOD_ADMIN, UserRole.DIOCESE_ADMIN, UserRole.CHURCH_ADMIN, UserRole.AUDITOR)) {
+            ProtectedRoute(navController, viewModel, listOf(UserRole.SYNOD_ADMIN, UserRole.DIOCESE_ADMIN, UserRole.CHURCH_ADMIN)) {
                 AssetsScreen(viewModel, onAddAsset = { /* TODO */ }, onBack = { navController.popBackStack() })
             }
         }
 
         composable(Screen.AuditLogs.route) {
-            ProtectedRoute(navController, viewModel, listOf(UserRole.SYNOD_ADMIN, UserRole.DIOCESE_ADMIN, UserRole.AUDITOR)) {
+            ProtectedRoute(navController, viewModel, listOf(UserRole.SYNOD_ADMIN, UserRole.DIOCESE_ADMIN)) {
                 AuditLogScreen(viewModel, onBack = { navController.popBackStack() })
             }
         }
@@ -165,18 +166,6 @@ fun NavGraph(
             }
         }
 
-        composable(Screen.AccountantDashboard.route) {
-            ProtectedRoute(navController, viewModel, listOf(UserRole.ACCOUNTANT)) {
-                AccountantDashboardScreen(viewModel, onNavigate = { navController.navigate(it) })
-            }
-        }
-
-        composable(Screen.AuditorDashboard.route) {
-            ProtectedRoute(navController, viewModel, listOf(UserRole.AUDITOR)) {
-                AuditorDashboardScreen(viewModel, onNavigate = { navController.navigate(it) })
-            }
-        }
-
         composable(Screen.Dashboard.route) {
             DashboardScreen(viewModel, onNavigate = { navController.navigate(it) })
         }
@@ -187,10 +176,11 @@ fun NavGraph(
         composable(Screen.AddExpense.route) { RecordExpenseScreen(viewModel, onBack = { navController.popBackStack() }) }
         composable(Screen.Transactions.route) { TransactionsListScreen(viewModel, onBack = { navController.popBackStack() }) }
         composable(Screen.Approvals.route) { ApprovalsScreen(viewModel, onBack = { navController.popBackStack() }, onNavigate = { navController.navigate(it) }) }
-        composable(Screen.Settings.route) { SettingsScreen(viewModel, onBack = { navController.popBackStack() }) }
+        composable(Screen.Settings.route) { SettingsScreen(viewModel, onBack = { navController.popBackStack() }, onNavigate = { navController.navigate(it) }) }
+        composable(Screen.Language.route) { LanguageScreen(viewModel, onBack = { navController.popBackStack() }) }
         composable(Screen.Profile.route) { ProfileScreen(viewModel, onBack = { navController.popBackStack() }) }
         composable(Screen.Hierarchy.route) { 
-            HierarchyTreeViewScreen(viewModel, onBack = { navController.popBackStack() }) 
+            HierarchyTreeViewScreen(viewModel, onBack = { navController.popBackStack() }, onNavigate = { navController.navigate(it) }) 
         }
         composable(Screen.OrgManagement.route) {
             OrganizationManagementScreen(
@@ -204,7 +194,7 @@ fun NavGraph(
             NotificationsScreen(viewModel, onBack = { navController.popBackStack() })
         }
         composable(Screen.Chure.route) {
-            ChureScreen(viewModel, onBack = { navController.popBackStack() })
+            ChureScreen(viewModel, onBack = { navController.popBackStack() }, onNavigate = { navController.navigate(it) })
         }
         composable(Screen.NationalMap.route) {
             NationalMapViewScreen(viewModel, onBack = { navController.popBackStack() })
@@ -235,23 +225,24 @@ fun NavGraph(
             }
         }
         composable(Screen.Treasury.route) {
-            ProtectedRoute(navController, viewModel, listOf(UserRole.CHURCH_ADMIN, UserRole.ACCOUNTANT)) {
+            ProtectedRoute(navController, viewModel, listOf(UserRole.CHURCH_ADMIN)) {
                 ParishTreasuryScreen(viewModel, onBack = { navController.popBackStack() })
             }
         }
         composable(Screen.Members.route) {
-            ProtectedRoute(navController, viewModel, listOf(UserRole.CHURCH_ADMIN, UserRole.ACCOUNTANT)) {
+            ProtectedRoute(navController, viewModel, listOf(UserRole.CHURCH_ADMIN)) {
                 MemberManagementScreen(viewModel, onBack = { navController.popBackStack() })
             }
+        }
+        composable(Screen.Certificates.route) {
+            CertificateScreen(viewModel, onBack = { navController.popBackStack() })
         }
     }
 }
 
 private fun getDashboardRouteForRoleString(role: String): String = when (role) {
     "synod_admin" -> Screen.SynodDashboard.route
-    "diocese_admin" -> Screen.DioceseDashboard.route
+    "diocese_admin" -> "diocese_dashboard" // This will match the template with default id
     "church_admin" -> Screen.ChurchDashboard.route
-    "accountant" -> Screen.AccountantDashboard.route
-    "auditor" -> Screen.AuditorDashboard.route
     else -> Screen.Dashboard.route
 }

@@ -120,8 +120,8 @@ fun AdvancedAnalyticsScreen(viewModel: FinancialViewModel, onBack: () -> Unit) {
                         }
                         Spacer(Modifier.height(16.dp))
                         // Line Chart
-                        val dataPoints = listOf(120f, 180f, 150f, 220f, 280f, 350f)
-                        val labels = listOf("Jan", "Feb", "Mar", "Apr", "May", "Jun")
+                        val dataPoints = listOf(120f, 150f, 140f, 180f, 190f, 220f, 250f, 280f, 310f, 350f, 330f, 380f)
+                        val labels = listOf("Sep", "Oct", "Nov", "Dec", "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug")
                         LineChart(
                             data = dataPoints,
                             labels = labels,
@@ -206,8 +206,8 @@ fun AdvancedAnalyticsScreen(viewModel: FinancialViewModel, onBack: () -> Unit) {
                         Spacer(Modifier.height(12.dp))
                         Box(modifier = Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
                             SimpleBarChart(
-                                data = listOf(8f, 6f, 9f, 7f, 10f, 8f),
-                                labels = listOf("Jan", "Feb", "Mar", "Apr", "May", "Jun"),
+                                data = listOf(8f, 7f, 9f, 8f, 6f, 9f, 7f, 10f, 8f, 11f, 9f, 12f),
+                                labels = listOf("Sep", "Oct", "Nov", "Dec", "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug"),
                                 barColor = PrimaryBlue,
                                 modifier = Modifier.fillMaxSize()
                             )

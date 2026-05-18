@@ -67,8 +67,6 @@ object SecurityManager {
             Resource.FINANCIALS -> when (role) {
                 UserRole.DIOCESE_ADMIN -> action in listOf(Action.READ, Action.APPROVE, Action.EXPORT)
                 UserRole.CHURCH_ADMIN -> true
-                UserRole.ACCOUNTANT -> action in listOf(Action.CREATE, Action.READ, Action.UPDATE)
-                UserRole.AUDITOR -> action in listOf(Action.READ, Action.AUDIT)
                 UserRole.MEMBER -> action == Action.READ // Can only read own contributions
                 else -> false
             }
@@ -83,7 +81,7 @@ object SecurityManager {
                 UserRole.CHURCH_ADMIN -> action in listOf(Action.READ, Action.UPDATE)
                 else -> action == Action.READ
             }
-            Resource.AUDIT_LOGS -> role in listOf(UserRole.AUDITOR, UserRole.SYNOD_ADMIN)
+            Resource.AUDIT_LOGS -> role == UserRole.SYNOD_ADMIN
             Resource.REPORTING -> role != UserRole.MEMBER
             Resource.SYSTEM_CONFIG -> false // Reserved for Synod
             else -> false
@@ -114,7 +112,7 @@ object SecurityManager {
 
         return when (role) {
             UserRole.DIOCESE_ADMIN -> user.dioceseId == targetDioceseId
-            UserRole.CHURCH_ADMIN, UserRole.ACCOUNTANT, UserRole.AUDITOR -> user.churchId == targetChurchId
+            UserRole.CHURCH_ADMIN -> user.churchId == targetChurchId
             UserRole.MEMBER -> user.churchId == targetChurchId
             else -> false
         }
@@ -125,8 +123,6 @@ object SecurityManager {
             1L -> UserRole.SYNOD_ADMIN
             2L -> UserRole.DIOCESE_ADMIN
             3L -> UserRole.CHURCH_ADMIN
-            4L -> UserRole.ACCOUNTANT
-            5L -> UserRole.AUDITOR
             else -> UserRole.MEMBER
         }
     }

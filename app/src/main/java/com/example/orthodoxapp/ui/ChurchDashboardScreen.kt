@@ -11,7 +11,10 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.*
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
+import androidx.compose.material3.TabRowDefaults.tabIndicatorOffset
 import androidx.compose.runtime.*
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -24,6 +27,7 @@ import androidx.compose.ui.layout.ContentScale
 import com.example.orthodoxapp.ui.components.AdminStatCard
 import com.example.orthodoxapp.ui.components.ManagementActionCard
 import com.example.orthodoxapp.ui.components.ManagementActionHorizontal
+import com.example.orthodoxapp.ui.components.SimpleBarChart
 import com.example.orthodoxapp.ui.theme.*
 import com.example.orthodoxapp.data.model.*
 
@@ -56,7 +60,7 @@ fun ChurchDashboardScreen(
             com.example.orthodoxapp.util.EthiopianDateUtils.getEthiopianMonth(it.date) == monthIdx
         }.sumOf { it.amount }.toFloat()
     }
-    val monthLabels = strings.ethiopianMonths.take(12).map { it.take(3) } // Shortened names
+    val monthLabels = listOf("Sep", "Oct", "Nov", "Dec", "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug")
 
 
     val users by viewModel.users.collectAsState()
@@ -89,7 +93,7 @@ fun ChurchDashboardScreen(
                                 color = PureLinen
                             )
                             Row(verticalAlignment = Alignment.CenterVertically) {
-                                Icon(Icons.Default.Church, contentDescription = null, tint = OrthodoxGold, modifier = Modifier.size(14.dp))
+                                Icon(Icons.Default.AccountBalance, contentDescription = null, tint = OrthodoxGold, modifier = Modifier.size(14.dp))
                                 Spacer(Modifier.width(4.dp))
                                 Text(
                                     text = "Administrator of $churchName",
@@ -100,6 +104,15 @@ fun ChurchDashboardScreen(
                             }
                         }
                         Row(verticalAlignment = Alignment.CenterVertically) {
+                            val isRefreshing by viewModel.isRefreshing.collectAsState()
+                            IconButton(onClick = { viewModel.refreshData() }) {
+                                if (isRefreshing) {
+                                    CircularProgressIndicator(modifier = Modifier.size(24.dp), color = OrthodoxGold, strokeWidth = 2.dp)
+                                } else {
+                                    Icon(Icons.Default.Refresh, contentDescription = "Refresh", tint = PureLinen)
+                                }
+                            }
+
                             var showMenu by remember { mutableStateOf(false) }
                             
                             IconButton(onClick = { onNavigate("notifications") }) {
@@ -206,6 +219,46 @@ fun ChurchDashboardScreen(
 
             // --- 2. QUICK ACTIONS GRID (FUNCTIONAL) ---
             item {
+                var showAnnounceDialog by remember { mutableStateOf(false) }
+                if (showAnnounceDialog) {
+                    var announceTitle by remember { mutableStateOf("") }
+                    var announceMessage by remember { mutableStateOf("") }
+                    AlertDialog(
+                        onDismissRequest = { showAnnounceDialog = false },
+                        title = { Text("Announce Event / Program") },
+                        text = {
+                            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                OutlinedTextField(
+                                    value = announceTitle,
+                                    onValueChange = { announceTitle = it },
+                                    label = { Text("Event Title") },
+                                    modifier = Modifier.fillMaxWidth()
+                                )
+                                OutlinedTextField(
+                                    value = announceMessage,
+                                    onValueChange = { announceMessage = it },
+                                    label = { Text("Event Details & Information") },
+                                    modifier = Modifier.fillMaxWidth(),
+                                    minLines = 3
+                                )
+                            }
+                        },
+                        confirmButton = {
+                            Button(onClick = {
+                                if (announceTitle.isNotEmpty()) {
+                                    viewModel.pushAnnouncement(announceTitle, announceMessage)
+                                    showAnnounceDialog = false
+                                }
+                            }) {
+                                Text("Push to Members")
+                            }
+                        },
+                        dismissButton = {
+                            TextButton(onClick = { showAnnounceDialog = false }) { Text("Cancel") }
+                        }
+                    )
+                }
+
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
                     ManagementActionCard("Income\nEntry", Icons.Default.AddCard, SuccessGreen, Modifier.weight(1f)) { onAddIncome() }
                     ManagementActionCard("Expense\nEntry", Icons.Default.Payments, ErrorRed, Modifier.weight(1f)) { onAddExpense() }
@@ -215,11 +268,51 @@ fun ChurchDashboardScreen(
                     ManagementActionCard("Approve\nFunds", Icons.AutoMirrored.Filled.FactCheck, WarningOrange, Modifier.weight(1f)) { onNavigate("approvals") }
                     ManagementActionCard("Audit\nReports", Icons.Default.Assessment, InfoBlue, Modifier.weight(1f)) { onNavigate("reports") }
                 }
+                Spacer(Modifier.height(16.dp))
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                    ManagementActionCard("Announce\nEvent", Icons.Default.Campaign, OrthodoxGoldDark, Modifier.weight(1f)) { showAnnounceDialog = true }
+                    Spacer(Modifier.weight(1f)) // Empty placeholder to keep grid balanced
+                }
             }
 
             // --- 3. APPROVAL WORKFLOW ---
             if (pendingRecords.isNotEmpty()) {
                 item {
+                    var selectedRecord by remember { mutableStateOf<Income?>(null) }
+                    
+                    if (selectedRecord != null) {
+                        AlertDialog(
+                            onDismissRequest = { selectedRecord = null },
+                            title = { Text("Transaction Details", fontWeight = FontWeight.ExtraBold) },
+                            text = {
+                                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                                    val memberName = users.find { it.id == selectedRecord?.createdBy }?.name ?: "Unknown Member"
+                                    DetailItem("Submitted By", memberName)
+                                    DetailItem("Source", selectedRecord?.source ?: "")
+                                    DetailItem("Amount", "ETB ${String.format("%,.2f", selectedRecord?.amount)}")
+                                    DetailItem("Category", selectedRecord?.category ?: "Offering")
+                                    DetailItem("Reference", selectedRecord?.referenceNumber ?: "N/A")
+                                    DetailItem("Payment Method", selectedRecord?.paymentMethod ?: "Cash")
+                                    DetailItem("Date", java.text.SimpleDateFormat("MMM dd, yyyy", java.util.Locale.getDefault()).format(java.util.Date(selectedRecord?.date ?: 0L)))
+                                    if (!selectedRecord?.description.isNullOrBlank()) {
+                                        DetailItem("Description", selectedRecord?.description ?: "")
+                                    }
+                                }
+                            },
+                            confirmButton = {
+                                Button(onClick = { 
+                                    viewModel.approveIncome(selectedRecord!!.id)
+                                    selectedRecord = null 
+                                }, colors = ButtonDefaults.buttonColors(containerColor = SuccessGreen)) {
+                                    Text("Approve Now")
+                                }
+                            },
+                            dismissButton = {
+                                TextButton(onClick = { selectedRecord = null }) { Text("Close") }
+                            }
+                        )
+                    }
+
                     Column {
                         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                             Text("Awaiting Blessing", fontWeight = FontWeight.Black, fontSize = 20.sp, color = TextPrimary)
@@ -228,7 +321,7 @@ fun ChurchDashboardScreen(
                         Spacer(Modifier.height(16.dp))
                         pendingRecords.take(2).forEach { record ->
                             Card(
-                                modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp),
+                                modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp).clickable { selectedRecord = record },
                                 shape = RoundedCornerShape(24.dp),
                                 colors = CardDefaults.cardColors(containerColor = SurfaceWhite),
                                 border = androidx.compose.foundation.BorderStroke(1.dp, WarningOrange.copy(alpha = 0.2f))
@@ -240,8 +333,11 @@ fun ChurchDashboardScreen(
                                         }
                                         Spacer(Modifier.width(16.dp))
                                         Column(modifier = Modifier.weight(1f)) {
-                                            Text(record.source, fontWeight = FontWeight.Bold, fontSize = 16.sp)
-                                            Text("Category: ${record.category ?: "Offering"}", fontSize = 12.sp, color = TextSecondary)
+                                            val memberName = users.find { it.id == record.createdBy }?.name ?: "Unknown Member"
+                                            Text(memberName, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                                            Text(record.source, fontSize = 13.sp, color = OrthodoxBlue, fontWeight = FontWeight.Medium)
+                                            Text("Ref: ${record.referenceNumber ?: "N/A"}", fontSize = 12.sp, color = TextSecondary)
+                                            Text("Category: ${record.category ?: "Offering"}", fontSize = 11.sp, color = TextSecondary)
                                         }
                                         Text("ETB ${String.format("%,.0f", record.amount)}", fontWeight = FontWeight.Black, fontSize = 18.sp, color = TextPrimary)
                                     }
@@ -291,7 +387,89 @@ fun ChurchDashboardScreen(
                 }
             }
 
-            // --- 4. REVENUE CHART ---
+            // --- 4. EXPENSE OVERSIGHT (DAILY/MONTHLY/ANNUAL) ---
+            item {
+                var selectedPeriod by remember { mutableIntStateOf(1) } // 0: Daily, 1: Monthly, 2: Annual
+                val periods = listOf("Daily", "Monthly", "Annual")
+                val cal = Calendar.getInstance()
+                val startTime = when(selectedPeriod) {
+                    0 -> { cal.set(Calendar.HOUR_OF_DAY, 0); cal.set(Calendar.MINUTE, 0); cal.timeInMillis }
+                    1 -> { cal.set(Calendar.DAY_OF_MONTH, 1); cal.set(Calendar.HOUR_OF_DAY, 0); cal.timeInMillis }
+                    else -> { cal.set(Calendar.MONTH, Calendar.JANUARY); cal.set(Calendar.DAY_OF_MONTH, 1); cal.timeInMillis }
+                }
+                val periodExpense = expenseRecords.filter { it.status == "APPROVED" && it.date >= startTime }.sumOf { it.amount }
+
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(24.dp),
+                    colors = CardDefaults.cardColors(containerColor = SurfaceWhite),
+                    elevation = CardDefaults.cardElevation(2.dp)
+                ) {
+                    Column(modifier = Modifier.padding(20.dp)) {
+                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                            Text("Expense Oversight", fontWeight = FontWeight.ExtraBold, fontSize = 18.sp, color = TextPrimary)
+                            Surface(shape = RoundedCornerShape(8.dp), color = ErrorRed.copy(alpha = 0.1f)) {
+                                Text("ETB ${String.format("%,.0f", periodExpense)}", modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp), color = ErrorRed, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                            }
+                        }
+                        Spacer(Modifier.height(16.dp))
+                        TabRow(
+                            selectedTabIndex = selectedPeriod,
+                            containerColor = Color.Transparent,
+                            contentColor = OrthodoxBlue,
+                            divider = {},
+                            indicator = { tabPositions ->
+                                TabRowDefaults.SecondaryIndicator(
+                                    modifier = Modifier.tabIndicatorOffset(tabPositions[selectedPeriod]),
+                                    color = OrthodoxBlue,
+                                    height = 2.dp
+                                )
+                            }
+                        ) {
+                        periods.forEachIndexed { index, title ->
+                                Tab(
+                                    selected = selectedPeriod == index,
+                                    onClick = { selectedPeriod = index },
+                                    text = { Text(title, fontSize = 12.sp, fontWeight = if (selectedPeriod == index) FontWeight.Bold else FontWeight.Normal) }
+                                )
+                            }
+                        }
+                        
+                        Spacer(Modifier.height(16.dp))
+                        
+                        val filteredPeriodExpenses = expenseRecords.filter { it.status == "APPROVED" && it.date >= startTime }.sortedByDescending { it.date }.take(3)
+                        
+                        if (filteredPeriodExpenses.isEmpty()) {
+                            Text("No expenses recorded for this period.", fontSize = 11.sp, color = TextSecondary, modifier = Modifier.padding(vertical = 8.dp))
+                        } else {
+                            filteredPeriodExpenses.forEach { exp ->
+                                Row(
+                                    modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(exp.category, fontSize = 13.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
+                                        Text(java.text.SimpleDateFormat("MMM dd", java.util.Locale.getDefault()).format(java.util.Date(exp.date)), fontSize = 10.sp, color = TextSecondary)
+                                    }
+                                    Text("-ETB ${String.format("%,.0f", exp.amount)}", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = ErrorRed)
+                                }
+                            }
+                            if (expenseRecords.filter { it.status == "APPROVED" && it.date >= startTime }.size > 3) {
+                                TextButton(
+                                    onClick = { onNavigate("reports") },
+                                    modifier = Modifier.align(Alignment.End),
+                                    contentPadding = PaddingValues(0.dp)
+                                ) {
+                                    Text("View All", fontSize = 11.sp, color = OrthodoxBlue)
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            // --- 5. REVENUE CHART ---
             item {
                 Card(
                     modifier = Modifier.fillMaxWidth(),
@@ -402,5 +580,12 @@ fun TransactionItemRow(title: String, amount: String, color: Color) {
             }
             Text(amount, fontWeight = FontWeight.ExtraBold, color = color, fontSize = 16.sp)
         }
+    }
+}
+@Composable
+fun DetailItem(label: String, value: String) {
+    Column {
+        Text(label, style = MaterialTheme.typography.labelSmall, color = TextSecondary)
+        Text(value, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.SemiBold, color = TextPrimary)
     }
 }

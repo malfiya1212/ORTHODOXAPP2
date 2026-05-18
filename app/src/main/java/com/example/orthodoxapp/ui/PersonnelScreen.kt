@@ -97,7 +97,7 @@ fun AddEmployeeDialog(onDismiss: () -> Unit, onConfirm: (String, String, Double,
     var salary by remember { mutableStateOf("") }
     var phone by remember { mutableStateOf("") }
     var expanded by remember { mutableStateOf(false) }
-    val roles = listOf("Head Priest", "Priest", "Deacon", "Accountant", "Secretary", "Security", "Maintenance")
+    val roles = listOf("Head Priest", "Priest", "Deacon", "Secretary", "Security", "Maintenance")
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -109,11 +109,11 @@ fun AddEmployeeDialog(onDismiss: () -> Unit, onConfirm: (String, String, Double,
                 ExposedDropdownMenuBox(expanded = expanded, onExpandedChange = { expanded = !expanded }) {
                     OutlinedTextField(
                         value = role,
-                        onValueChange = {},
+                        onValueChange = { _ -> },
                         readOnly = true,
                         label = { Text("Ecclesiastical Role") },
                         trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
-                        modifier = Modifier.fillMaxWidth().menuAnchor(type = MenuAnchorType.PrimaryNotEditable, enabled = true)
+                        modifier = Modifier.fillMaxWidth().menuAnchor(MenuAnchorType.PrimaryNotEditable)
                     )
                     ExposedDropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
                         roles.forEach { r ->

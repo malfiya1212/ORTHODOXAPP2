@@ -28,13 +28,17 @@ import com.example.orthodoxapp.data.model.UserRole
 fun ProfileScreen(viewModel: FinancialViewModel, onBack: () -> Unit) {
     val currentUser by viewModel.currentUser.collectAsState()
     val role by viewModel.currentRole.collectAsState()
+    val actionState by viewModel.actionState.collectAsState()
+    val scaffoldState = remember { SnackbarHostState() }
+
+    var showEditDialog by remember { mutableStateOf(false) }
+    var editName by remember { mutableStateOf(currentUser?.name ?: "") }
+    var editEmail by remember { mutableStateOf(currentUser?.email ?: "") }
     
     val roleName = when(role) {
         UserRole.SYNOD_ADMIN -> "Holy Synod Admin"
         UserRole.DIOCESE_ADMIN -> "Diocese Admin"
         UserRole.CHURCH_ADMIN -> "Parish Admin"
-        UserRole.ACCOUNTANT -> "Church Accountant"
-        UserRole.AUDITOR -> "Church Auditor"
         UserRole.MEMBER -> "Church Member"
         else -> "Guest"
     }
@@ -66,7 +70,7 @@ fun ProfileScreen(viewModel: FinancialViewModel, onBack: () -> Unit) {
         ) {
             Spacer(modifier = Modifier.height(32.dp))
             
-            // Profile Picture Placeholder
+    
             Surface(
                 modifier = Modifier.size(110.dp),
                 shape = CircleShape,
@@ -105,12 +109,63 @@ fun ProfileScreen(viewModel: FinancialViewModel, onBack: () -> Unit) {
             Spacer(modifier = Modifier.height(32.dp))
             
             Button(
-                onClick = {},
+                onClick = { showEditDialog = true },
                 modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp).height(56.dp),
                 colors = ButtonDefaults.buttonColors(containerColor = OrthodoxBlue),
-                shape = RoundedCornerShape(16.dp)
+                shape = RoundedCornerShape(16.dp),
+                enabled = actionState !is ActionState.Loading
             ) {
-                Text("Edit Profile Information", fontWeight = FontWeight.Bold, color = PureLinen)
+                if (actionState is ActionState.Loading) {
+                    CircularProgressIndicator(color = Color.White, modifier = Modifier.size(24.dp))
+                } else {
+                    Text("Edit Profile Information", fontWeight = FontWeight.Bold, color = PureLinen)
+                }
+            }
+
+            if (showEditDialog) {
+                AlertDialog(
+                    onDismissRequest = { showEditDialog = false },
+                    title = { Text("Edit Profile") },
+                    text = {
+                        Column {
+                            OutlinedTextField(
+                                value = editName,
+                                onValueChange = { editName = it },
+                                label = { Text("Name") },
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                            Spacer(modifier = Modifier.height(8.dp))
+                            OutlinedTextField(
+                                value = editEmail,
+                                onValueChange = { editEmail = it },
+                                label = { Text("Email") },
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                        }
+                    },
+                    confirmButton = {
+                        TextButton(onClick = {
+                            val updatedUser = currentUser?.copy(name = editName, email = editEmail)
+                            if (updatedUser != null) {
+                                viewModel.updateUser(updatedUser)
+                            }
+                            showEditDialog = false
+                        }) {
+                            Text("Save")
+                        }
+                    },
+                    dismissButton = {
+                        TextButton(onClick = { showEditDialog = false }) {
+                            Text("Cancel")
+                        }
+                    }
+                )
+            }
+
+            if (actionState is ActionState.Error) {
+                LaunchedEffect(scaffoldState) {
+                    scaffoldState.showSnackbar((actionState as ActionState.Error).message)
+                }
             }
 
             Spacer(modifier = Modifier.height(16.dp))

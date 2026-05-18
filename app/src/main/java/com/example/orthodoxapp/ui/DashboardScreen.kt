@@ -10,6 +10,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Logout
 import androidx.compose.material.icons.automirrored.filled.MenuBook
+import androidx.compose.material.icons.automirrored.filled.Help
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
@@ -142,6 +143,25 @@ fun DashboardScreen(viewModel: FinancialViewModel, onNavigate: (String) -> Unit 
                         
                         Text(text = "TOTAL CONTRIBUTIONS", color = OrthodoxGold, fontSize = 12.sp, fontWeight = FontWeight.ExtraBold, letterSpacing = 1.sp)
                         Text(text = "ETB ${String.format("%,.2f", totalApproved)}", color = PureLinen, fontSize = 36.sp, fontWeight = FontWeight.Black)
+                        
+                        Spacer(modifier = Modifier.height(16.dp))
+                        
+                        // Monthly Progress Bar
+                        val monthlyGoal = 5000.0
+                        val progress = (thisMonthGiving / monthlyGoal).coerceIn(0.0, 1.0).toFloat()
+                        Column {
+                            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                                Text("Monthly Goal Progress", color = PureLinen.copy(alpha = 0.6f), fontSize = 11.sp)
+                                Text("${(progress * 100).toInt()}%", color = OrthodoxGold, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                            }
+                            Spacer(Modifier.height(6.dp))
+                            LinearProgressIndicator(
+                                progress = { progress },
+                                modifier = Modifier.fillMaxWidth().height(6.dp).clip(CircleShape),
+                                color = OrthodoxGold,
+                                trackColor = PureLinen.copy(alpha = 0.1f)
+                            )
+                        }
                     }
                 }
             }
@@ -184,14 +204,67 @@ fun DashboardScreen(viewModel: FinancialViewModel, onNavigate: (String) -> Unit 
                 }
             }
 
-            // --- 4. CONTRIBUTION SUMMARY (Recent Breakdown) ---
+            // --- 4. SPIRITUAL PROGRESS & DAILY VERSE ---
+            item {
+                Row(modifier = Modifier.padding(horizontal = 24.dp), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                    Card(
+                        modifier = Modifier.weight(1.2f),
+                        shape = RoundedCornerShape(24.dp),
+                        colors = CardDefaults.cardColors(containerColor = OrthodoxBlue.copy(alpha = 0.05f))
+                    ) {
+                        Column(modifier = Modifier.padding(20.dp)) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(Icons.Default.AutoAwesome, contentDescription = null, tint = OrthodoxBlue, modifier = Modifier.size(18.dp))
+                                Spacer(Modifier.width(8.dp))
+                                Text("Spiritual Path", fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                            }
+                            Spacer(Modifier.height(12.dp))
+                            Text("Level: Faithful", fontSize = 12.sp, color = OrthodoxBlue, fontWeight = FontWeight.Bold)
+                            Spacer(Modifier.height(4.dp))
+                            Text("3 Services Attended", fontSize = 11.sp, color = TextSecondary)
+                        }
+                    }
+                    
+                    Card(
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(24.dp),
+                        colors = CardDefaults.cardColors(containerColor = OrthodoxGold.copy(alpha = 0.1f))
+                    ) {
+                        Column(modifier = Modifier.padding(20.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                            Icon(Icons.Default.WbSunny, contentDescription = null, tint = OrthodoxGold, modifier = Modifier.size(24.dp))
+                            Spacer(Modifier.height(8.dp))
+                            Text("Morning", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                            Text("Prayer", fontSize = 11.sp, color = TextSecondary)
+                        }
+                    }
+                }
+            }
+
+            // --- 5. PARISH ANNOUNCEMENTS ---
             item {
                 Column(modifier = Modifier.padding(horizontal = 24.dp)) {
-                    Text("Monthly Summary", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
-                    Spacer(Modifier.height(12.dp))
-                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                        SummaryMiniCard("Pending", "$pendingContributions", WarningOrange, Modifier.weight(1f))
-                        SummaryMiniCard("This Month", "ETB 2,500", InfoBlue, Modifier.weight(1f))
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                        Text("Parish Announcements", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
+                        Icon(Icons.Default.NotificationsActive, contentDescription = null, tint = OrthodoxBlue, modifier = Modifier.size(20.dp))
+                    }
+                    Spacer(Modifier.height(16.dp))
+                    
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(20.dp),
+                        colors = CardDefaults.cardColors(containerColor = Color.White),
+                        elevation = CardDefaults.cardElevation(2.dp)
+                    ) {
+                        Row(modifier = Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Surface(shape = RoundedCornerShape(12.dp), color = OrthodoxBlue.copy(alpha = 0.1f)) {
+                                Icon(Icons.Default.Event, contentDescription = null, tint = OrthodoxBlue, modifier = Modifier.padding(12.dp))
+                            }
+                            Spacer(Modifier.width(16.dp))
+                            Column {
+                                Text("Annual Parish Meeting", fontWeight = FontWeight.Bold, fontSize = 15.sp)
+                                Text("Next Sunday after Liturgy", fontSize = 12.sp, color = TextSecondary)
+                            }
+                        }
                     }
                 }
             }
@@ -232,7 +305,7 @@ fun DashboardScreen(viewModel: FinancialViewModel, onNavigate: (String) -> Unit 
                     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                             ServiceButton("My Tithe", Icons.Default.Payments, Modifier.weight(1f)) { onNavigate("income") }
-                            ServiceButton("Certificates", Icons.Default.Badge, Modifier.weight(1f)) { onNavigate("profile") }
+                            ServiceButton("Certificates", Icons.Default.Badge, Modifier.weight(1f)) { onNavigate(Screen.Certificates.route) }
                             ServiceButton("Groups", Icons.Default.Groups, Modifier.weight(1f)) { onNavigate("chure") }
                         }
                         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -263,6 +336,29 @@ fun DashboardScreen(viewModel: FinancialViewModel, onNavigate: (String) -> Unit 
                         )
                         Spacer(Modifier.height(8.dp))
                         Text("- 2 Corinthians 9:7", fontSize = 12.sp, color = OrthodoxBlue, fontWeight = FontWeight.Bold)
+                    }
+                }
+            }
+
+            // --- 8. HELP & SUPPORT ---
+            item {
+                Column(modifier = Modifier.padding(horizontal = 24.dp)) {
+                    Text("Help & Support", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
+                    Spacer(Modifier.height(12.dp))
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(16.dp),
+                        colors = CardDefaults.cardColors(containerColor = Color.White),
+                        elevation = CardDefaults.cardElevation(1.dp)
+                    ) {
+                        Row(modifier = Modifier.padding(16.dp).clickable { /* Open Support */ }, verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.AutoMirrored.Filled.Help, contentDescription = null, tint = OrthodoxBlue)
+                            Spacer(Modifier.width(16.dp))
+                            Column {
+                                Text("Contact Parish Treasury", fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                                Text("support@parish.com", fontSize = 12.sp, color = TextSecondary)
+                            }
+                        }
                     }
                 }
             }

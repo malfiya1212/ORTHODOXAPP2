@@ -79,11 +79,13 @@ fun MoreScreen(navController: NavController, viewModel: FinancialViewModel, modi
         ) {
             items(allItems) { item -> 
                 MoreItem(item) { 
-                    if (item.title == "Logout") {
-                        viewModel.logout()
-                        navController.navigate(item.route!!) { popUpTo(0) { inclusive = true } }
-                    } else {
-                        navController.navigate(item.route!!)
+                    item.route?.let { route ->
+                        if (item.title == "Logout") {
+                            viewModel.logout()
+                            navController.navigate(route) { popUpTo(0) { inclusive = true } }
+                        } else {
+                            navController.navigate(route)
+                        }
                     }
                 } 
             }

@@ -26,7 +26,7 @@ val TextSecondary = Color(0xFF64748B)
 
 // Accent Status Colors (Real Production Shades)
 val SuccessGreen = Color(0xFF10B981)
-val ErrorRed = Color(0xFFEF4444)
+val ErrorRed = Color(0xFF4CAF50)
 val WarningOrange = Color(0xFFF59E0B)
 val InfoBlue = Color(0xFF3B82F6)
 

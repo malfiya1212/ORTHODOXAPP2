@@ -1,5 +1,6 @@
 package com.example.orthodoxapp.ui
 
+import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -24,6 +25,7 @@ import androidx.compose.ui.unit.sp
 import com.example.orthodoxapp.data.model.Diocese
 import com.example.orthodoxapp.ui.components.AdminStatCard
 import com.example.orthodoxapp.ui.components.ManagementActionHorizontal
+import com.example.orthodoxapp.ui.components.SimpleBarChart
 import com.example.orthodoxapp.ui.theme.*
 import com.example.orthodoxapp.data.model.*
 import java.util.Locale
@@ -60,6 +62,15 @@ fun AdminDashboardScreen(
                     }
                 },
                 actions = {
+                    val isRefreshing by viewModel.isRefreshing.collectAsState()
+                    IconButton(onClick = { viewModel.refreshData() }) {
+                        if (isRefreshing) {
+                            CircularProgressIndicator(modifier = Modifier.size(24.dp), color = OrthodoxGold, strokeWidth = 2.dp)
+                        } else {
+                            Icon(Icons.Default.Refresh, contentDescription = "Refresh", tint = PureLinen)
+                        }
+                    }
+
                     IconButton(onClick = { onNavigate("notifications") }) {
                         BadgedBox(badge = { if (pendingRecords.isNotEmpty()) Badge { Text(pendingRecords.size.toString()) } }) {
                             Icon(Icons.Default.Notifications, contentDescription = null, tint = PureLinen)
@@ -118,12 +129,17 @@ fun AdminDashboardScreen(
             // --- 1. NATIONAL EXECUTIVE SUMMARY ---
             item {
                 Column {
-                    Text("National Summary", fontWeight = FontWeight.Black, fontSize = 22.sp, color = TextPrimary)
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                        Text("National Summary", fontWeight = FontWeight.Black, fontSize = 22.sp, color = TextPrimary)
+                        TextButton(onClick = { onNavigate("reports") }) {
+                            Text("View Full Reports", color = OrthodoxBlue)
+                        }
+                    }
                     Spacer(Modifier.height(16.dp))
                     
                     // Large Treasury Card
                     Card(
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier.fillMaxWidth().clickable { onNavigate("reports") },
                         shape = RoundedCornerShape(32.dp),
                         colors = CardDefaults.cardColors(containerColor = OrthodoxBlueDark),
                         elevation = CardDefaults.cardElevation(12.dp)
@@ -158,7 +174,7 @@ fun AdminDashboardScreen(
                     // Stats Grid
                     Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
                         StatSmallCard("Dioceses", "${dioceses.size}", Icons.Default.LocationCity, InfoBlue, Modifier.weight(1f))
-                        StatSmallCard("Churches", "${churches.size}", Icons.Default.Church, OrthodoxGold, Modifier.weight(1f))
+                        StatSmallCard("Churches", "${churches.size}", Icons.Default.AccountBalance, OrthodoxGold, Modifier.weight(1f))
                         StatSmallCard("Members", "$membersCount", Icons.Default.Groups, Color(0xFF10B981), Modifier.weight(1f))
                     }
                 }
@@ -179,9 +195,9 @@ fun AdminDashboardScreen(
                         }
                         Spacer(Modifier.height(24.dp))
                         Box(Modifier.height(200.dp).fillMaxWidth()) {
-                            com.example.orthodoxapp.ui.components.SimpleBarChart(
-                                data = listOf(60f, 75f, 50f, 90f, 100f, 120f),
-                                labels = listOf("Mes", "Tik", "Hid", "Tah", "Tir", "Yak"),
+                            SimpleBarChart(
+                                data = listOf(60f, 75f, 50f, 90f, 100f, 120f, 110f, 95f, 130f, 140f, 125f, 150f),
+                                labels = listOf("Sep", "Oct", "Nov", "Dec", "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug"),
                                 barColor = OrthodoxBlue,
                                 modifier = Modifier.fillMaxSize()
                             )
@@ -237,7 +253,7 @@ fun AdminDashboardScreen(
                     Text("Recent National Activity", fontWeight = FontWeight.Black, fontSize = 20.sp, color = TextPrimary)
                     Spacer(Modifier.height(16.dp))
                     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                        ActivityItem("New Church Added", "St. Mary, Gondar Diocese", Icons.Default.Church, InfoBlue)
+                        ActivityItem("New Church Added", "St. Mary, Gondar Diocese", Icons.Default.AccountBalance, InfoBlue)
                         if (pendingRecords.isNotEmpty()) {
                             ActivityItem("${pendingRecords.size} Pending Approvals", "Total: ${formatCurrency(pendingRecords.sumOf { it.amount })}", Icons.Default.Warning, WarningOrange)
                         }
@@ -261,8 +277,15 @@ fun AdminDashboardScreen(
                 }
             }
 
-            items(dioceses.take(5)) { diocese ->
-                DioceseListItem(diocese) { onNavigate(Screen.DioceseDashboard.createRoute(diocese.id)) }
+            items(dioceses) { diocese ->
+                val dioceseChurches = churches.filter { it.dioceseId == diocese.id }
+                DioceseListItem(
+                    diocese = diocese, 
+                    churches = dioceseChurches,
+                    incomes = incomes,
+                    expenses = expenses,
+                    onViewDashboard = { onNavigate(Screen.DioceseDashboard.createRoute(diocese.id)) }
+                )
             }
         }
     }
@@ -354,23 +377,129 @@ private fun StatCard(label: String, value: String, icon: ImageVector, color: Col
 }
 
 @Composable
-private fun DioceseListItem(diocese: Diocese, onClick: () -> Unit) {
+private fun DioceseListItem(
+    diocese: Diocese, 
+    churches: List<Church>, 
+    incomes: List<Income>,
+    expenses: List<Expense>,
+    onViewDashboard: () -> Unit
+) {
+    var expanded by remember { mutableStateOf(false) }
+    
+    // Calculate Aggregate Financials for this Diocese
+    val churchIds = churches.map { it.id }.toSet()
+    val dioceseIncomes = incomes.filter { it.churchId in churchIds && it.status == "APPROVED" }
+    val dioceseExpenses = expenses.filter { it.churchId in churchIds && it.status == "APPROVED" }
+    
+    val totalIncome = dioceseIncomes.sumOf { it.amount }
+    val totalExpense = dioceseExpenses.sumOf { it.amount }
+    val balance = totalIncome - totalExpense
+    
     Card(
-        modifier = Modifier.fillMaxWidth().clickable { onClick() },
-        shape = RoundedCornerShape(16.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 6.dp)
+            .animateContentSize(),
+        shape = RoundedCornerShape(24.dp),
         colors = CardDefaults.cardColors(containerColor = SurfaceWhite),
-        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+        elevation = CardDefaults.cardElevation(defaultElevation = 3.dp)
     ) {
-        Row(modifier = Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
-            Surface(modifier = Modifier.size(48.dp), shape = RoundedCornerShape(12.dp), color = OrthodoxBlue.copy(alpha = 0.05f)) {
-                Icon(Icons.Default.LocationCity, contentDescription = null, tint = OrthodoxBlue, modifier = Modifier.padding(12.dp))
+        Column {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { expanded = !expanded }
+                    .padding(24.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Surface(
+                    modifier = Modifier.size(56.dp),
+                    shape = RoundedCornerShape(16.dp),
+                    color = OrthodoxBlue.copy(alpha = 0.1f)
+                ) {
+                    Icon(Icons.Default.LocationCity, contentDescription = null, tint = OrthodoxBlue, modifier = Modifier.padding(14.dp))
+                }
+                Spacer(Modifier.width(20.dp))
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(diocese.name, fontWeight = FontWeight.Black, fontSize = 20.sp, color = TextPrimary)
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Default.AccountBalance, contentDescription = null, tint = OrthodoxGold, modifier = Modifier.size(12.dp))
+                        Spacer(Modifier.width(6.dp))
+                        Text("${churches.size} Total Parishes", fontSize = 13.sp, color = TextSecondary, fontWeight = FontWeight.Bold)
+                    }
+                }
+                
+                Column(horizontalAlignment = Alignment.End) {
+                    Text("ETB ${String.format(java.util.Locale.getDefault(), "%,.0f", balance)}", fontWeight = FontWeight.Black, fontSize = 16.sp, color = OrthodoxBlue)
+                    Text("Balance", fontSize = 10.sp, color = TextSecondary, fontWeight = FontWeight.Bold)
+                }
             }
-            Spacer(Modifier.width(16.dp))
-            Column(modifier = Modifier.weight(1f)) {
-                Text(diocese.name, fontWeight = FontWeight.Bold, fontSize = 16.sp, color = TextPrimary)
-                Text("Bishop: ${diocese.bishopName ?: "Not Assigned"}", fontSize = 12.sp, color = TextSecondary)
+
+            if (expanded) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 24.dp, vertical = 16.dp)
+                ) {
+                    // DIOCESE-LEVEL FINANCIAL REPORT
+                    Text("DIOCESE FINANCIAL REPORT", fontSize = 11.sp, fontWeight = FontWeight.Black, color = OrthodoxGold, letterSpacing = 1.2.sp)
+                    Spacer(Modifier.height(16.dp))
+                    
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                        DioceseMiniStat("Aggregate Income", totalIncome, SuccessGreen, Modifier.weight(1f))
+                        DioceseMiniStat("Aggregate Expense", totalExpense, ErrorRed, Modifier.weight(1f))
+                    }
+                    
+                    Spacer(Modifier.height(24.dp))
+                    
+                    // About Diocese Information
+                    Surface(
+                        color = BackgroundLight.copy(alpha = 0.5f),
+                        shape = RoundedCornerShape(16.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Row(modifier = Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text("Lead Administrator", fontSize = 10.sp, color = TextSecondary, fontWeight = FontWeight.Bold)
+                                Text(diocese.bishopName ?: "Bishop Not Assigned", fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                            }
+                            VerticalDivider(modifier = Modifier.height(30.dp).padding(horizontal = 16.dp))
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text("Headquarters", fontSize = 10.sp, color = TextSecondary, fontWeight = FontWeight.Bold)
+                                Text(diocese.location ?: "National Office", fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                            }
+                        }
+                    }
+                    
+                    Spacer(Modifier.height(24.dp))
+                    
+                    Button(
+                        onClick = onViewDashboard,
+                        modifier = Modifier.fillMaxWidth().height(52.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = OrthodoxBlue),
+                        shape = RoundedCornerShape(14.dp)
+                    ) {
+                        Icon(Icons.Default.Analytics, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(Modifier.width(12.dp))
+                        Text("View Full Regional Audit Dashboard", fontWeight = FontWeight.Bold)
+                    }
+                }
             }
-            Icon(Icons.AutoMirrored.Filled.ArrowForward, contentDescription = null, tint = Color.LightGray, modifier = Modifier.size(20.dp))
+        }
+    }
+}
+
+@Composable
+private fun DioceseMiniStat(label: String, amount: Double, color: Color, modifier: Modifier) {
+    Surface(
+        modifier = modifier,
+        shape = RoundedCornerShape(12.dp),
+        color = color.copy(alpha = 0.05f),
+        border = androidx.compose.foundation.BorderStroke(1.dp, color.copy(alpha = 0.1f))
+    ) {
+        Column(modifier = Modifier.padding(12.dp)) {
+            Text(label, fontSize = 9.sp, fontWeight = FontWeight.Bold, color = TextSecondary)
+            Text("ETB ${String.format(java.util.Locale.getDefault(), "%,.0f", amount)}", fontSize = 15.sp, fontWeight = FontWeight.Black, color = color)
         }
     }
 }

@@ -55,7 +55,7 @@ fun ApprovalsScreen(viewModel: FinancialViewModel, onBack: () -> Unit, onNavigat
                 contentColor = PureLinen,
                 indicator = { tabPositions ->
                     TabRowDefaults.SecondaryIndicator(
-                        Modifier.tabIndicatorOffset(tabPositions[selectedTab]),
+                        modifier = Modifier.tabIndicatorOffset(tabPositions[selectedTab]),
                         color = OrthodoxGold
                     )
                 }

@@ -21,21 +21,28 @@ import androidx.compose.ui.unit.sp
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun LanguageScreen(onBack: () -> Unit) {
-    var selectedLanguage by remember { mutableStateOf("English") }
+fun LanguageScreen(viewModel: FinancialViewModel, onBack: () -> Unit) {
+    val currentLang by viewModel.currentLanguage.collectAsState()
     
     val languages = listOf(
-        LanguageItem("Amharic", "አማርኛ", "ET"),
-        LanguageItem("English", "English", "US"),
-        LanguageItem("Afaan Oromoo", "Oromoo", "ET"),
-        LanguageItem("Tigrinya", "ትግርኛ", "ET"),
-        LanguageItem("Somali", "Soomaali", "SO"),
-        LanguageItem("Afar", "Qafaraf", "ET"),
-        LanguageItem("Sidamo", "Sidaamu Afoo", "ET"),
-        LanguageItem("Wolaytta", "Wolayttattuwa", "ET"),
-        LanguageItem("Gurage", "ጉራጌ", "ET"),
-        LanguageItem("Geez", "ግዕዝ (Liturgical)", "ET")
+        LanguageItem(com.example.orthodoxapp.util.Language.AMHARIC, "አማርኛ", "ET"),
+        LanguageItem(com.example.orthodoxapp.util.Language.ENGLISH, "English", "US"),
+        LanguageItem(com.example.orthodoxapp.util.Language.OROMOO, "Afaan Oromoo", "ET"),
+        LanguageItem(com.example.orthodoxapp.util.Language.TIGRINYA, "ትግርኛ", "ET"),
+        LanguageItem(com.example.orthodoxapp.util.Language.SOMALI, "Soomaali", "SO"),
+        LanguageItem(com.example.orthodoxapp.util.Language.AFAR, "Qafaraf", "ET"),
+        LanguageItem(com.example.orthodoxapp.util.Language.SIDAMO, "Sidaamu Afoo", "ET"),
+        LanguageItem(com.example.orthodoxapp.util.Language.WOLAYTTA, "Wolayttattuwa", "ET"),
+        LanguageItem(com.example.orthodoxapp.util.Language.GURAGE, "ጉራጌ", "ET"),
+        LanguageItem(com.example.orthodoxapp.util.Language.HADIYISA, "Hadiyisa", "ET"),
+        LanguageItem(com.example.orthodoxapp.util.Language.GAMO, "Gamo-Kello", "ET"),
+        LanguageItem(com.example.orthodoxapp.util.Language.KAFA, "Kafficho", "ET"),
+        LanguageItem(com.example.orthodoxapp.util.Language.AGEW, "Agewigna", "ET"),
+        LanguageItem(com.example.orthodoxapp.util.Language.BERTA, "Berta", "ET"),
+        LanguageItem(com.example.orthodoxapp.util.Language.ANYUAK, "Anyuak", "ET"),
+        LanguageItem(com.example.orthodoxapp.util.Language.GEEZ, "ግዕዝ (Liturgical)", "ET")
     )
+
 
     Scaffold(
         topBar = {
@@ -66,11 +73,15 @@ fun LanguageScreen(onBack: () -> Unit) {
                 )
             }
             
-            items(languages) { language ->
+            items(languages) { item ->
+                val isSelected = (item.language != null && currentLang == item.language)
                 LanguageRow(
-                    language = language,
-                    isSelected = selectedLanguage == language.name,
-                    onClick = { selectedLanguage = language.name }
+                    label = item.label,
+                    secondary = item.language?.name ?: "Coming Soon",
+                    isSelected = isSelected,
+                    onClick = { 
+                        item.language?.let { viewModel.setLanguage(it) }
+                    }
                 )
                 HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp), thickness = 0.5.dp, color = Color.LightGray)
             }
@@ -78,10 +89,10 @@ fun LanguageScreen(onBack: () -> Unit) {
     }
 }
 
-data class LanguageItem(val name: String, val nativeName: String, val countryCode: String)
+data class LanguageItem(val language: com.example.orthodoxapp.util.Language?, val label: String, val countryCode: String)
 
 @Composable
-fun LanguageRow(language: LanguageItem, isSelected: Boolean, onClick: () -> Unit) {
+fun LanguageRow(label: String, secondary: String, isSelected: Boolean, onClick: () -> Unit) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -102,8 +113,8 @@ fun LanguageRow(language: LanguageItem, isSelected: Boolean, onClick: () -> Unit
             }
             Spacer(Modifier.width(16.dp))
             Column {
-                Text(language.nativeName, fontWeight = FontWeight.Bold, fontSize = 16.sp, color = if (isSelected) Color(0xFF3F3D89) else Color.Black)
-                Text(language.name, fontSize = 12.sp, color = Color.Gray)
+                Text(label, fontWeight = FontWeight.Bold, fontSize = 16.sp, color = if (isSelected) Color(0xFF3F3D89) else Color.Black)
+                Text(secondary, fontSize = 12.sp, color = Color.Gray)
             }
         }
         

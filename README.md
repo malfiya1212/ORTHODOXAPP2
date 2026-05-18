@@ -1,5 +1,5 @@
-# Tewahedo Connect ERP
-## Ethiopian Orthodox Tewahedo Church Finance & Management System
+# Financial Management System for the Ethiopian Orthodox Church
+## Comprehensive Ecclesiastical Administration & Transparency Platform
 
 ### ✝️ About This Project
 **Tewahedo Connect** is a specialized Enterprise Resource Planning (ERP) platform designed to modernize the administrative and financial workflows of the **Ethiopian Orthodox Tewahedo Church (EOTC)**. 

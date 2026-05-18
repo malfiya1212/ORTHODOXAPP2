@@ -8,7 +8,5 @@ object Constants {
     const val ROLE_SYNOD_ADMIN = 1L
     const val ROLE_DIOCESE_ADMIN = 2L
     const val ROLE_CHURCH_ADMIN = 3L
-    const val ROLE_ACCOUNTANT = 4L
-    const val ROLE_AUDITOR = 5L
     const val ROLE_MEMBER = 6L
 }

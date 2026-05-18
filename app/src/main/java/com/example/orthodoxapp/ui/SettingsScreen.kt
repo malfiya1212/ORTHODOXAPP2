@@ -24,7 +24,7 @@ import com.example.orthodoxapp.ui.theme.*
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun SettingsScreen(viewModel: FinancialViewModel, onBack: () -> Unit) {
+fun SettingsScreen(viewModel: FinancialViewModel, onBack: () -> Unit, onNavigate: (String) -> Unit) {
     var notificationsEnabled by remember { mutableStateOf(true) }
     val darkModeEnabled by viewModel.isDarkMode.collectAsState()
     var biometricEnabled by remember { mutableStateOf(false) }
@@ -81,7 +81,7 @@ fun SettingsScreen(viewModel: FinancialViewModel, onBack: () -> Unit) {
                 headlineContent = { Text("App Language") },
                 supportingContent = { Text("Current: English (አማርኛ available)") },
                 trailingContent = { Icon(Icons.Default.Language, contentDescription = null, tint = OrthodoxBlue) },
-                modifier = Modifier.clickable { /* Language Select */ }
+                modifier = Modifier.clickable { onNavigate("language") }
             )
             HorizontalDivider()
 

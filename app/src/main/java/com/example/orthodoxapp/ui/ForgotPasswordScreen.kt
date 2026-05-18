@@ -28,6 +28,31 @@ fun ForgotPasswordScreen(viewModel: FinancialViewModel, onBack: () -> Unit, onRe
     var otp by remember { mutableStateOf("") }
     var newPassword by remember { mutableStateOf("") }
     var isLoading by remember { mutableStateOf(false) }
+    var errorMessage by remember { mutableStateOf<String?>(null) }
+
+    val actionState by viewModel.actionState.collectAsState()
+
+    LaunchedEffect(actionState) {
+        when (actionState) {
+            is ActionState.Success -> {
+                if (step == 3) {
+                    onResetSuccess()
+                    viewModel.resetActionState()
+                }
+                isLoading = false
+            }
+            is ActionState.Error -> {
+                errorMessage = (actionState as ActionState.Error).message
+                isLoading = false
+            }
+            is ActionState.Loading -> {
+                isLoading = true
+            }
+            else -> {
+                isLoading = false
+            }
+        }
+    }
 
     Scaffold(
         topBar = {
@@ -67,11 +92,20 @@ fun ForgotPasswordScreen(viewModel: FinancialViewModel, onBack: () -> Unit, onRe
 
             Spacer(modifier = Modifier.height(32.dp))
 
+            if (errorMessage != null) {
+                Text(
+                    text = errorMessage!!,
+                    color = MaterialTheme.colorScheme.error,
+                    modifier = Modifier.padding(bottom = 16.dp),
+                    textAlign = TextAlign.Center
+                )
+            }
+
             when (step) {
                 1 -> {
                     Text("Forgot Password?", fontWeight = FontWeight.Bold, fontSize = 24.sp)
                     Text(
-                        "Enter your email or phone number to receive a 6-digit OTP code.",
+                        "Enter your email address to receive a 6-digit OTP code.",
                         textAlign = TextAlign.Center,
                         color = Color.Gray,
                         modifier = Modifier.padding(top = 8.dp)
@@ -79,17 +113,20 @@ fun ForgotPasswordScreen(viewModel: FinancialViewModel, onBack: () -> Unit, onRe
                     Spacer(modifier = Modifier.height(40.dp))
                     OutlinedTextField(
                         value = identifier,
-                        onValueChange = { identifier = it },
-                        label = { Text("Email or Phone") },
+                        onValueChange = { 
+                            identifier = it
+                            errorMessage = null
+                        },
+                        label = { Text("Email Address") },
                         modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(12.dp)
+                        shape = RoundedCornerShape(12.dp),
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email)
                     )
                     Spacer(modifier = Modifier.height(32.dp))
                     Button(
                         onClick = {
-                            isLoading = true
+                            errorMessage = null
                             viewModel.sendOtpToEmail(identifier) { success ->
-                                isLoading = false
                                 if (success) step = 2
                             }
                         },
@@ -113,17 +150,34 @@ fun ForgotPasswordScreen(viewModel: FinancialViewModel, onBack: () -> Unit, onRe
                     Spacer(modifier = Modifier.height(40.dp))
                     OutlinedTextField(
                         value = otp,
-                        onValueChange = { if (it.length <= 6) otp = it },
+                        onValueChange = { 
+                            if (it.length <= 6) otp = it 
+                            errorMessage = null
+                        },
                         label = { Text("Enter 6-digit Code") },
                         modifier = Modifier.fillMaxWidth(),
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                         shape = RoundedCornerShape(12.dp),
                         textStyle = androidx.compose.ui.text.TextStyle(textAlign = TextAlign.Center)
                     )
+                    Text(
+                        "Didn't receive the code? Please check your spam folder.",
+                        fontSize = 11.sp,
+                        color = Color.Gray,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.padding(top = 8.dp)
+                    )
                     Spacer(modifier = Modifier.height(32.dp))
                     Button(
-                        onClick = { step = 3 },
+                        onClick = { 
+                            if (viewModel.verifyOtp(otp)) {
+                                step = 3
+                            } else {
+                                errorMessage = "Invalid OTP code. Try again."
+                            }
+                        },
                         modifier = Modifier.fillMaxWidth().height(56.dp),
+                        enabled = otp.length == 6,
                         colors = ButtonDefaults.buttonColors(containerColor = PrimaryBlue),
                         shape = RoundedCornerShape(12.dp)
                     ) {
@@ -141,19 +195,28 @@ fun ForgotPasswordScreen(viewModel: FinancialViewModel, onBack: () -> Unit, onRe
                     Spacer(modifier = Modifier.height(40.dp))
                     OutlinedTextField(
                         value = newPassword,
-                        onValueChange = { newPassword = it },
+                        onValueChange = { 
+                            newPassword = it
+                            errorMessage = null
+                        },
                         label = { Text("New Password") },
                         modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(12.dp)
+                        shape = RoundedCornerShape(12.dp),
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password)
                     )
                     Spacer(modifier = Modifier.height(32.dp))
                     Button(
-                        onClick = { onResetSuccess() },
+                        onClick = { 
+                            errorMessage = null
+                            viewModel.resetPassword(identifier, newPassword) 
+                        },
                         modifier = Modifier.fillMaxWidth().height(56.dp),
+                        enabled = newPassword.isNotEmpty() && !isLoading,
                         colors = ButtonDefaults.buttonColors(containerColor = PrimaryBlue),
                         shape = RoundedCornerShape(12.dp)
                     ) {
-                        Text("Update Password", fontWeight = FontWeight.Bold)
+                        if (isLoading) CircularProgressIndicator(color = Color.White, modifier = Modifier.size(24.dp))
+                        else Text("Update Password", fontWeight = FontWeight.Bold)
                     }
                 }
             }

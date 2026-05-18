@@ -6,9 +6,11 @@ import com.example.orthodoxapp.data.local.dao.FinanceDao
 import com.example.orthodoxapp.data.local.dao.UserDao
 import com.example.orthodoxapp.data.local.dao.SyncDao
 import com.example.orthodoxapp.data.model.*
+import com.example.orthodoxapp.data.model.Certificate
 
 @Database(
     entities = [
+        Certificate::class,
         User::class,
         Role::class,
         Diocese::class,
@@ -43,7 +45,7 @@ import com.example.orthodoxapp.data.model.*
         ChurchAsset::class,
         FinancialApproval::class
     ],
-    version = 21,
+    version = 25,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {

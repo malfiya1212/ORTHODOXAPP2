@@ -39,25 +39,29 @@ fun TransactionReceiptScreen(
     val expenseRecords by viewModel.expenses.collectAsState()
     
     val transactionData = if (type == "INCOME") {
-        incomeRecords.find { inc: Income -> inc.id == id }?.let { it: Income ->
+        incomeRecords.find { it.id == id }?.let {
             ReceiptData(
                 amount = it.amount,
                 source = it.source,
                 category = it.category ?: "Tithe",
                 reference = it.referenceNumber ?: "TRX-INC-${it.id}",
                 date = it.date,
-                status = it.status
+                status = it.status,
+                paymentMethod = it.paymentMethod ?: "Cash",
+                originalAmount = it.originalAmount,
+                originalCurrency = it.originalCurrency
             )
         }
     } else {
-        expenseRecords.find { exp: Expense -> exp.id == id }?.let { it: Expense ->
+        expenseRecords.find { it.id == id }?.let {
             ReceiptData(
                 amount = it.amount,
                 source = it.recipient ?: "Unknown",
                 category = it.category,
                 reference = it.referenceNumber ?: "TRX-EXP-${it.id}",
                 date = it.date,
-                status = it.status
+                status = it.status,
+                paymentMethod = it.paymentMethod ?: "Cash"
             )
         }
     }
@@ -144,6 +148,16 @@ fun TransactionReceiptScreen(
                         Spacer(Modifier.height(24.dp))
                         Text("ETB ${String.format(java.util.Locale.getDefault(), "%,.2f", transactionData.amount)}", fontSize = 28.sp, fontWeight = FontWeight.ExtraBold, color = textColor)
                         
+                        if (transactionData.originalCurrency != null && transactionData.originalCurrency != "ETB" && transactionData.originalAmount != null) {
+                            Text(
+                                "Original: ${transactionData.originalCurrency} ${String.format(java.util.Locale.getDefault(), "%,.2f", transactionData.originalAmount)}",
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.Medium,
+                                color = textLight,
+                                modifier = Modifier.padding(top = 4.dp)
+                            )
+                        }
+                        
                         Spacer(Modifier.height(32.dp))
                         HorizontalDivider(color = Color(0xFFF1F5F9))
                         Spacer(Modifier.height(24.dp))
@@ -152,7 +166,7 @@ fun TransactionReceiptScreen(
                         ReceiptDetailRow("Church", "Local Parish Church")
                         ReceiptDetailRow(if (type == "INCOME") "From" else "To", transactionData.source)
                         ReceiptDetailRow("Category", transactionData.category)
-                        ReceiptDetailRow("Payment Method", "Cash / Bank")
+                        ReceiptDetailRow("Payment Method", transactionData.paymentMethod)
                         ReceiptDetailRow("Transaction ID", transactionData.reference)
                         ReceiptDetailRow("Date", java.text.DateFormat.getDateTimeInstance().format(transactionData.date))
                         
@@ -217,7 +231,10 @@ data class ReceiptData(
     val category: String,
     val reference: String,
     val date: Long,
-    val status: String
+    val status: String,
+    val paymentMethod: String = "Cash",
+    val originalAmount: Double? = null,
+    val originalCurrency: String? = null
 )
 
 @Composable

@@ -26,6 +26,7 @@ import androidx.compose.ui.unit.sp
 import com.example.orthodoxapp.data.model.*
 import com.example.orthodoxapp.ui.components.AdminStatCard
 import com.example.orthodoxapp.ui.components.ManagementActionHorizontal
+import com.example.orthodoxapp.ui.components.SimpleBarChart
 import com.example.orthodoxapp.ui.theme.*
 import java.util.Locale
 
@@ -56,17 +57,9 @@ fun DioceseDashboardScreen(
     }
     val churchIds = churchesInThisDiocese.map { it.id }.toSet()
 
-    val filteredIncomes = if (overrideDioceseId != null) {
-        incomes.filter { it.churchId in churchIds }
-    } else {
-        incomes
-    }
+    val filteredIncomes = incomes.filter { it.churchId in churchIds }
 
-    val filteredExpenses = if (overrideDioceseId != null) {
-        expenses.filter { it.churchId in churchIds }
-    } else {
-        expenses
-    }
+    val filteredExpenses = expenses.filter { it.churchId in churchIds }
 
     val totalIncome = filteredIncomes.filter { it.status == "APPROVED" }.sumOf { it.amount }
     val totalExpense = filteredExpenses.filter { it.status == "APPROVED" }.sumOf { it.amount }
@@ -80,10 +73,11 @@ fun DioceseDashboardScreen(
     val monthlyIncome = filteredIncomes.filter { it.status == "APPROVED" && it.date >= startOfMonth }.sumOf { it.amount }
     val monthlyExpense = filteredExpenses.filter { it.status == "APPROVED" && it.date >= startOfMonth }.sumOf { it.amount }
     
-    // Pending Metrics
     val pendingRecords = filteredIncomes.filter { it.status == "PENDING" }
     val pendingCount = pendingRecords.size
     val pendingAmount = pendingRecords.sumOf { it.amount }
+
+    val isRefreshing by viewModel.isRefreshing.collectAsState()
 
     val formatCurrency = { amount: Double -> "ETB ${String.format(Locale.getDefault(), "%,.2f", amount)}" }
     val formatCompact = { amount: Double -> "ETB ${String.format(Locale.getDefault(), "%,.0f", amount)}" }
@@ -99,6 +93,14 @@ fun DioceseDashboardScreen(
                     }
                 },
                 actions = {
+                    IconButton(onClick = { viewModel.refreshData() }) {
+                        if (isRefreshing) {
+                            CircularProgressIndicator(modifier = Modifier.size(24.dp), color = OrthodoxGold, strokeWidth = 2.dp)
+                        } else {
+                            Icon(Icons.Default.Refresh, contentDescription = "Refresh", tint = PureLinen)
+                        }
+                    }
+
                     IconButton(onClick = { onNavigate("notifications") }) {
                         BadgedBox(badge = { if (pendingCount > 0) Badge { Text(pendingCount.toString()) } }) {
                             Icon(Icons.Default.Notifications, contentDescription = null, tint = PureLinen)
@@ -184,8 +186,8 @@ fun DioceseDashboardScreen(
                             // Church Count Badge
                             Surface(color = PureLinen.copy(alpha = 0.1f), shape = RoundedCornerShape(12.dp)) {
                                 Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                                    Text("${churches.size}", color = PureLinen, fontWeight = FontWeight.Black, fontSize = 18.sp)
-                                    Text("CHURCHES", color = PureLinen.copy(alpha = 0.6f), fontSize = 8.sp, fontWeight = FontWeight.Bold)
+                                    Text("${churchesInThisDiocese.size}", color = PureLinen, fontWeight = FontWeight.Black, fontSize = 18.sp)
+                                    Text("PARISHES", color = PureLinen.copy(alpha = 0.6f), fontSize = 8.sp, fontWeight = FontWeight.Bold)
                                 }
                             }
                         }
@@ -268,7 +270,7 @@ fun DioceseDashboardScreen(
                                             val church = churches.find { it.id == record.churchId }
                                             Text("Parish: ${church?.name ?: "Local Parish"}", fontSize = 12.sp, color = TextSecondary)
                                         }
-                                        Text("ETB ${String.format("%,.0f", record.amount)}", fontWeight = FontWeight.Black, fontSize = 18.sp, color = TextPrimary)
+                                        Text("ETB ${String.format(java.util.Locale.getDefault(), "%,.0f", record.amount)}", fontWeight = FontWeight.Black, fontSize = 18.sp, color = TextPrimary)
                                     }
                                     Spacer(Modifier.height(20.dp))
                                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -304,12 +306,17 @@ fun DioceseDashboardScreen(
                     }
                     Spacer(Modifier.height(16.dp))
                     
-                    if (churches.isEmpty()) {
+                    if (churchesInThisDiocese.isEmpty()) {
                         Surface(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(24.dp), color = SurfaceWhite) {
-                            Text("Initializing parish monitoring...", color = TextSecondary, modifier = Modifier.padding(24.dp))
+                            Text("No parishes found in this diocese.", color = TextSecondary, modifier = Modifier.padding(24.dp))
                         }
                     } else {
-                        churches.take(3).forEach { church ->
+                        churchesInThisDiocese.forEach { church ->
+                            val cIncome = incomes.filter { it.churchId == church.id && it.status == "APPROVED" }.sumOf { it.amount }
+                            val cExpense = expenses.filter { it.churchId == church.id && it.status == "APPROVED" }.sumOf { it.amount }
+                            val cBalance = cIncome - cExpense
+                            val cPending = incomes.count { it.churchId == church.id && it.status == "PENDING" }
+
                             Card(
                                 modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp).clickable { onNavigate(Screen.ChurchDetail.createRoute(church.id)) },
                                 shape = RoundedCornerShape(24.dp),
@@ -317,21 +324,45 @@ fun DioceseDashboardScreen(
                                 elevation = CardDefaults.cardElevation(1.dp)
                             ) {
                                 Row(modifier = Modifier.padding(20.dp), verticalAlignment = Alignment.CenterVertically) {
-                                    Surface(shape = RoundedCornerShape(14.dp), color = OrthodoxBlue.copy(alpha = 0.1f), modifier = Modifier.size(52.dp)) {
-                                        Icon(Icons.Default.Church, contentDescription = null, tint = OrthodoxBlue, modifier = Modifier.padding(14.dp))
+                                    Box {
+                                        Surface(shape = RoundedCornerShape(14.dp), color = OrthodoxBlue.copy(alpha = 0.1f), modifier = Modifier.size(52.dp)) {
+                                            Icon(Icons.Default.Church, contentDescription = null, tint = OrthodoxBlue, modifier = Modifier.padding(14.dp))
+                                        }
+                                        if (cPending > 0) {
+                                            Surface(
+                                                modifier = Modifier.align(Alignment.TopEnd).offset(4.dp, (-4).dp),
+                                                shape = CircleShape,
+                                                color = ErrorRed
+                                            ) {
+                                                Text(
+                                                    text = cPending.toString(),
+                                                    color = Color.White,
+                                                    fontSize = 10.sp,
+                                                    fontWeight = FontWeight.Bold,
+                                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                                )
+                                            }
+                                        }
                                     }
                                     Spacer(Modifier.width(16.dp))
                                     Column(Modifier.weight(1f)) {
                                         Text(church.name, fontWeight = FontWeight.Black, fontSize = 16.sp, color = TextPrimary)
                                         Row(verticalAlignment = Alignment.CenterVertically) {
-                                            Surface(color = SuccessGreen, shape = CircleShape, modifier = Modifier.size(6.dp)) {}
+                                            Surface(color = if (cPending > 0) WarningOrange else SuccessGreen, shape = CircleShape, modifier = Modifier.size(6.dp)) {}
                                             Spacer(Modifier.width(6.dp))
-                                            Text("Active Control", fontSize = 11.sp, color = TextSecondary)
+                                            Text(if (cPending > 0) "$cPending Updates Pending" else "Active Control", fontSize = 11.sp, color = TextSecondary)
                                         }
                                     }
                                     Column(horizontalAlignment = Alignment.End) {
-                                        Text("ETB 0.00", fontWeight = FontWeight.Bold, color = TextPrimary, fontSize = 14.sp)
-                                        Text("Balance", fontSize = 10.sp, color = TextSecondary)
+                                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                            IconButton(onClick = { onNavigate(Screen.AddOrganization.createRoute("Church", church.id)) }) {
+                                                Icon(Icons.Default.Edit, contentDescription = "Update Church", tint = OrthodoxBlue, modifier = Modifier.size(20.dp))
+                                            }
+                                            Column(horizontalAlignment = Alignment.End) {
+                                                Text("ETB ${String.format(Locale.getDefault(), "%,.0f", cBalance)}", fontWeight = FontWeight.Bold, color = TextPrimary, fontSize = 14.sp)
+                                                Text("Balance", fontSize = 10.sp, color = TextSecondary)
+                                            }
+                                        }
                                     }
                                 }
                             }
@@ -358,12 +389,30 @@ fun DioceseDashboardScreen(
                                 Icon(Icons.AutoMirrored.Filled.OpenInNew, contentDescription = "Full Analytics", tint = OrthodoxBlue)
                             }
                         }
-                        Spacer(Modifier.height(24.dp))
-                        Box(Modifier.height(180.dp).fillMaxWidth()) {
+                        val months = listOf("Sep", "Oct", "Nov", "Dec", "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug")
+                        val monthlyData = FloatArray(12)
+                        filteredIncomes.filter { it.status == "APPROVED" }.forEach { record ->
+                            val cal = Calendar.getInstance().apply { timeInMillis = record.date }
+                            val calMonth = cal.get(Calendar.MONTH)
+                            val index = (calMonth + 4) % 12
+                            monthlyData[index] += record.amount.toFloat()
+                        }
+
+                        // Determine bar colors based on trend
+                        val barColors = mutableListOf<Color>()
+                        for (i in 0 until 12) {
+                            if (i == 0 || monthlyData[i] >= monthlyData[i - 1]) {
+                                barColors.add(OrthodoxBlue)
+                            } else {
+                                barColors.add(Color(0xFF64748B)) // Slate gray for decrease
+                            }
+                        }
+
+                        Box(Modifier.height(200.dp).fillMaxWidth()) {
                             SimpleBarChart(
-                                data = listOf(45f, 52f, 48f, 65f, 70f, 75f),
-                                labels = listOf("Mes", "Tik", "Hid", "Tah", "Tir", "Yak"),
-                                barColor = OrthodoxBlue,
+                                data = monthlyData.toList(),
+                                labels = months,
+                                barColors = barColors,
                                 modifier = Modifier.fillMaxSize()
                             )
                         }
@@ -510,7 +559,7 @@ fun DioceseDashboardContent(churchesCount: Int, income: Double, expense: Double,
                     Box(Modifier.height(220.dp).fillMaxWidth()) {
                         SimpleBarChart(
                             data = listOf(45f, 52f, 48f, 65f, 70f, 75f, 80f, 85f, 90f, 95f, 100f, 110f),
-                            labels = strings.ethiopianMonths.take(12).map { it.take(3) },
+                            labels = listOf("Sep", "Oct", "Nov", "Dec", "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug"),
                             barColor = OrthodoxBlue,
                             modifier = Modifier.fillMaxSize()
                         )

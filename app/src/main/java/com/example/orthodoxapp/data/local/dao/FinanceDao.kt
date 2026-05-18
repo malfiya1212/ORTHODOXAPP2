@@ -2,6 +2,7 @@ package com.example.orthodoxapp.data.local.dao
 
 import androidx.room.*
 import com.example.orthodoxapp.data.model.*
+import com.example.orthodoxapp.data.model.Certificate
 import kotlinx.coroutines.flow.Flow
 
 @Dao
@@ -26,6 +27,9 @@ interface FinanceDao {
     @Query("SELECT * FROM churches WHERE dioceseId = :dioceseId ORDER BY name ASC")
     fun getChurchesByDiocese(dioceseId: Long): Flow<List<Church>>
 
+    @Query("SELECT * FROM churches WHERE id = :id LIMIT 1")
+    suspend fun getChurchByIdSync(id: Long): Church?
+
     @Update
     suspend fun updateChurch(church: Church)
 
@@ -38,6 +42,26 @@ interface FinanceDao {
 
     @Query("SELECT * FROM users WHERE email = :email LIMIT 1")
     suspend fun getUserByEmail(email: String): User?
+
+    @Query("SELECT * FROM users WHERE churchId = :churchId AND roleId = 3 LIMIT 1")
+    suspend fun getChurchAdminSync(churchId: Long): User?
+
+    @Query("SELECT * FROM users WHERE id = :id LIMIT 1")
+    suspend fun getUserByIdSync(id: Long): User?
+    
+    @Update
+    suspend fun updateUser(user: User)
+
+    @Query("""
+        UPDATE users 
+        SET status = 'INACTIVE' 
+        WHERE roleId = 6 
+        AND status = 'ACTIVE' 
+        AND id NOT IN (
+            SELECT createdBy FROM income WHERE date > :sixMonthsAgo
+        )
+    """)
+    suspend fun deactivateInactiveMembers(sixMonthsAgo: Long)
 
     @Query("SELECT * FROM users ORDER BY name ASC")
     fun getAllUsers(): Flow<List<User>>
@@ -226,4 +250,11 @@ interface FinanceDao {
 
     @Query("UPDATE notifications SET isRead = 1 WHERE id = :id")
     suspend fun markNotificationAsRead(id: Long)
+
+    // --- CERTIFICATES ---
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertCertificate(certificate: Certificate): Long
+
+    @Query("SELECT * FROM certificates WHERE userId = :userId ORDER BY issuedDate DESC")
+    fun getCertificatesByUserId(userId: Long): Flow<List<Certificate>>
 }

@@ -15,9 +15,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import kotlinx.coroutines.launch
 import com.example.orthodoxapp.ui.theme.PrimaryBlue
 import com.example.orthodoxapp.data.model.*
 
@@ -48,12 +50,22 @@ fun RegistrationScreen(
     val hostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
 
+    val context = androidx.compose.ui.platform.LocalContext.current
+
     LaunchedEffect(loginState) {
         if (loginState is LoginState.Success) {
+            android.widget.Toast.makeText(context, "Registration successful! Please log in.", android.widget.Toast.LENGTH_LONG).show()
             onRegisterSuccess()
             viewModel.resetLoginState()
         } else if (loginState is LoginState.Error) {
             hostState.showSnackbar((loginState as LoginState.Error).message)
+        }
+    }
+
+    LaunchedEffect(actionState) {
+        if (actionState is ActionState.Error) {
+            hostState.showSnackbar((actionState as ActionState.Error).message)
+            viewModel.resetActionState()
         }
     }
 
@@ -131,7 +143,7 @@ fun RegistrationScreen(
         Box(modifier = Modifier.fillMaxWidth()) {
             OutlinedTextField(
                 value = churches.find { it.id == selectedChurchId }?.name ?: "Select Your Church",
-                onValueChange = {},
+                onValueChange = { _ -> },
                 readOnly = true,
                 label = { Text("Parish / Church") },
                 trailingIcon = { 
@@ -240,18 +252,36 @@ fun RegistrationScreen(
                 leadingIcon = { Icon(Icons.Default.VpnKey, contentDescription = null, tint = PrimaryBlue) },
                 keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = androidx.compose.ui.text.input.KeyboardType.Number)
             )
+            Text(
+                text = "Didn't receive the code? Please check your spam folder.",
+                fontSize = 11.sp,
+                color = Color.Gray,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.padding(top = 8.dp)
+            )
             Spacer(modifier = Modifier.height(16.dp))
             Button(
                 onClick = { 
-                    if (viewModel.verifyOtp(otpCode)) {
-                        isOtpVerified = true
+                    if (otpCode.length == 6) {
+                        if (viewModel.verifyOtp(otpCode)) {
+                            isOtpVerified = true
+                        } else {
+                            scope.launch { hostState.showSnackbar("Invalid OTP. Please check the code sent to your email.") }
+                        }
+                    } else {
+                        scope.launch { hostState.showSnackbar("Please enter a 6-digit code.") }
                     }
                 },
                 modifier = Modifier.fillMaxWidth().height(56.dp),
+                enabled = loginState !is LoginState.Loading && actionState !is ActionState.Loading,
                 colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF4CAF50)),
                 shape = RoundedCornerShape(12.dp)
             ) {
-                Text("Verify & Complete Registration", fontWeight = FontWeight.Bold)
+                if (loginState is LoginState.Loading) {
+                    CircularProgressIndicator(color = Color.White, modifier = Modifier.size(24.dp))
+                } else {
+                    Text("Verify & Complete Registration", fontWeight = FontWeight.Bold)
+                }
             }
             
             TextButton(onClick = { isOtpSent = false }) {
