@@ -374,6 +374,32 @@ class FinancialViewModel(private val repository: FinanceRepository) : ViewModel(
             else -> "member"
         }
         setRole(roleString)
+        
+        // Auto-award two mock certificates if they have none, so the Certificates Screen is populated
+        viewModelScope.launch {
+            try {
+                val certs = repository.getCertificatesByUser(user.id).first()
+                if (certs.isEmpty()) {
+                    repository.addCertificate(
+                        userId = user.id,
+                        churchId = user.churchId ?: 1L,
+                        title = "Certificate of Spiritual Devotion",
+                        awardType = "SERVICE",
+                        description = "In recognition of outstanding dedication, faithful attendance, and active participation in the holy services of the parish.",
+                        issuerId = 1L
+                    )
+                    repository.addCertificate(
+                        userId = user.id,
+                        churchId = user.churchId ?: 1L,
+                        title = "Sacred Liturgy & Hymnody Training",
+                        awardType = "PROGRAM",
+                        description = "Awarded for completing the ecclesiastical educational course in traditional liturgical hymns and Geez language basics.",
+                        issuerId = 1L
+                    )
+                }
+            } catch (_: Exception) {}
+        }
+        
         _loginState.value = LoginState.Success(roleString)
     }
 
@@ -406,6 +432,26 @@ class FinancialViewModel(private val repository: FinanceRepository) : ViewModel(
                     repository.seedDatabase()
                 }
             } catch (_: Exception) {}
+
+            try {
+                // Ensure all churches in local database have latitude and longitude for Google Maps display
+                val list = repository.allChurches.first()
+                list.forEach { church ->
+                    if (church.latitude == null || church.longitude == null) {
+                        val updated = when (church.name) {
+                            "St. George Cathedral" -> church.copy(latitude = 9.0356, longitude = 38.7525)
+                            "Holy Trinity Cathedral" -> church.copy(latitude = 9.0315, longitude = 38.7628)
+                            "Bole Medhane Alem Cathedral" -> church.copy(latitude = 8.9984, longitude = 38.7885)
+                            else -> {
+                                val lat = 9.03 + (Math.random() - 0.5) * 0.1
+                                val lng = 38.74 + (Math.random() - 0.5) * 0.1
+                                church.copy(latitude = lat, longitude = lng)
+                            }
+                        }
+                        repository.updateChurch(updated)
+                    }
+                }
+            } catch (_: Exception) {}
         }
     }
 
@@ -429,6 +475,8 @@ class FinancialViewModel(private val repository: FinanceRepository) : ViewModel(
 
     val dioceses: StateFlow<List<Diocese>> = repository.allDioceses.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
     
+    val allChurches: StateFlow<List<Church>> = repository.allChurches.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
     val churches: StateFlow<List<Church>> = combine(currentRole, currentUser) { role, user ->
         if (user == null) {
             repository.allChurches

@@ -33,11 +33,15 @@ import androidx.lifecycle.viewModelScope
 import com.google.android.gms.maps.CameraUpdateFactory
 import kotlinx.coroutines.launch
 import coil.compose.AsyncImage
+import androidx.compose.ui.platform.LocalContext
+import android.content.Intent
+import android.net.Uri
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun NationalMapViewScreen(viewModel: FinancialViewModel, onBack: () -> Unit) {
-    val churches by viewModel.churches.collectAsState()
+    val context = LocalContext.current
+    val churches by viewModel.allChurches.collectAsState()
     var selectedChurch by remember { mutableStateOf<Church?>(null) }
     var searchQuery by remember { mutableStateOf("") }
     
@@ -45,6 +49,19 @@ fun NationalMapViewScreen(viewModel: FinancialViewModel, onBack: () -> Unit) {
     val userLocation = LatLng(9.03, 38.74)
     val cameraPositionState = rememberCameraPositionState {
         position = CameraPosition.fromLatLngZoom(userLocation, 12f)
+    }
+
+    LaunchedEffect(selectedChurch) {
+        selectedChurch?.let { church ->
+            val lat = church.latitude
+            val lng = church.longitude
+            if (lat != null && lng != null) {
+                cameraPositionState.animate(
+                    update = CameraUpdateFactory.newLatLngZoom(LatLng(lat, lng), 15f),
+                    durationMs = 800
+                )
+            }
+        }
     }
 
     val filterOptions = listOf("All", "Churches", "Nearest", "My Location")
@@ -308,7 +325,25 @@ fun NationalMapViewScreen(viewModel: FinancialViewModel, onBack: () -> Unit) {
                             Spacer(Modifier.height(12.dp))
                             
                             Button(
-                                onClick = { /* Navigate */ },
+                                onClick = {
+                                    val lat = selectedChurch?.latitude
+                                    val lng = selectedChurch?.longitude
+                                    if (lat != null && lng != null) {
+                                        val mapUri = Uri.parse("https://www.google.com/maps/dir/?api=1&destination=$lat,$lng")
+                                        val mapIntent = Intent(Intent.ACTION_VIEW, mapUri)
+                                        // Attempt to directly target the Google Maps app if available, otherwise browser will resolve it
+                                        mapIntent.setPackage("com.google.android.apps.maps")
+                                        try {
+                                            context.startActivity(mapIntent)
+                                        } catch (e: Exception) {
+                                            // Fallback: clear package so any web browser or map handler can open it
+                                            mapIntent.setPackage(null)
+                                            try {
+                                                context.startActivity(mapIntent)
+                                            } catch (_: Exception) {}
+                                        }
+                                    }
+                                },
                                 modifier = Modifier.fillMaxWidth(),
                                 colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF064E3B)),
                                 shape = RoundedCornerShape(12.dp)

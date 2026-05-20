@@ -365,6 +365,37 @@ class FinanceRepository(
         dioceses.forEach { name -> dao.insertDiocese(Diocese(name = name)) }
         dao.insertChurch(Church(name = "St. George Cathedral", location = "Addis Ababa", dioceseId = 1L))
         dao.insertUser(User(id = 1, name = "Synod Admin", email = "superadmin@church.com", roleId = 1L, passwordHash = com.example.orthodoxapp.security.PasswordHasher.hashPassword("Super@123")))
+        
+        // Seed default member and contributions for testing Contribution Certificates
+        dao.insertUser(User(id = 5, name = "Tewodros Kassahun", email = "member@church.com", roleId = 6L, churchId = 1L, role = "MEMBER", passwordHash = com.example.orthodoxapp.security.PasswordHasher.hashPassword("Member@123")))
+        
+        dao.insertIncome(Income(
+            churchId = 1L,
+            accountId = 1L,
+            amount = 5000.0,
+            source = "Parish Tithe",
+            status = "APPROVED",
+            createdBy = 5L,
+            approvedBy = 1L,
+            category = "Tithe",
+            description = "Annual tithe contribution for St. George Parish Development",
+            paymentMethod = "Bank Transfer",
+            referenceNumber = "TXN987654"
+        ))
+        dao.insertIncome(Income(
+            churchId = 1L,
+            accountId = 1L,
+            amount = 2500.0,
+            source = "Monthly Pledge",
+            status = "APPROVED",
+            createdBy = 5L,
+            approvedBy = 1L,
+            category = "Donation",
+            description = "Monthly building fund contribution",
+            paymentMethod = "Cash",
+            referenceNumber = "TXN987655"
+        ))
+
         dao.insertAccount(Account(name = "Main Fund", churchId = 1L, balance = 100000.0))
         
         // Seed some initial clergy

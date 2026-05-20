@@ -64,7 +64,7 @@ namespace EOC.Finance.API.Services
                 Action = "PAYMENT_PROCESSED",
                 TableName = "Payments",
                 RecordId = payment.ChurchId, // Using ChurchId as general ref since RecordId is long and Payment.Id is Guid
-                Details = $"Received {dto.Amount} ETB via {dto.PaymentMethod}. Receipt: {receiptNo}",
+                Details = $"Received {finalEtbValue} ETB via {dto.PaymentMethod}. Receipt: {receiptNo}",
                 Timestamp = DateTime.UtcNow
             };
             _context.AuditLogs.Add(audit);

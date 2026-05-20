@@ -3,6 +3,7 @@ using EOC.Finance.API.Services;
 using EOC.Finance.API.DTOs;
 using System.Security.Claims;
 using System.Threading.Tasks;
+using System.Text;
 
 namespace EOC.Finance.API.Controllers
 {

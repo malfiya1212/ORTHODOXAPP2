@@ -11,6 +11,8 @@ namespace EOC.Finance.API.Services
         Task<ChurchFinancialReportDto> GenerateChurchReportAsync(long churchId);
         Task<DioceseFinancialReportDto> GenerateDioceseReportAsync(long dioceseId);
         Task<NationalFinancialReportDto> GenerateNationalReportAsync();
+        Task<IEnumerable<ReportDto>> GetReportsByChurchAsync(long churchId);
+        Task<ReportDto> GenerateReportAsync(long churchId, string type, long userId);
     }
 
     public class ReportService : IReportService
@@ -98,6 +100,59 @@ namespace EOC.Finance.API.Services
                 AllEthiopiaTotalExpenses = nationalExpenses,
                 NationalReserve = nationalIncome - nationalExpenses,
                 DioceseRankings = dioceseReports.OrderByDescending(r => r.TotalNetBalance).ToList()
+            };
+        }
+
+        public async Task<IEnumerable<ReportDto>> GetReportsByChurchAsync(long churchId)
+        {
+            var documents = await _context.Documents
+                .Include(d => d.Church)
+                .Where(d => d.ChurchId == churchId && d.FileType == "AnnualReport")
+                .ToListAsync();
+
+            return documents.Select(d => new ReportDto
+            {
+                Id = Math.Abs(BitConverter.ToInt64(d.Id.ToByteArray(), 0)),
+                Title = d.FileName,
+                Type = "ANNUAL",
+                Format = "PDF",
+                GeneratedAt = d.UploadedAt,
+                FileUrl = d.BlobStorageUrl,
+                ChurchId = d.ChurchId,
+                ChurchName = d.Church?.Name
+            });
+        }
+
+        public async Task<ReportDto> GenerateReportAsync(long churchId, string type, long userId)
+        {
+            var churchReport = await GenerateChurchReportAsync(churchId);
+            
+            var docId = Guid.NewGuid();
+            var document = new Document
+            {
+                Id = docId,
+                ChurchId = churchId,
+                UploadedBy = userId,
+                FileName = $"{type}_Report_{DateTime.UtcNow:yyyyMMdd}.pdf",
+                FileType = "AnnualReport",
+                BlobStorageUrl = $"https://api.tewahedo-finance.org/reports/{docId}.pdf",
+                Version = 1,
+                UploadedAt = DateTime.UtcNow
+            };
+
+            _context.Documents.Add(document);
+            await _context.SaveChangesAsync();
+
+            return new ReportDto
+            {
+                Id = Math.Abs(BitConverter.ToInt64(document.Id.ToByteArray(), 0)),
+                Title = document.FileName,
+                Type = type,
+                Format = "PDF",
+                GeneratedAt = document.UploadedAt,
+                FileUrl = document.BlobStorageUrl,
+                ChurchId = churchId,
+                ChurchName = churchReport.ChurchName
             };
         }
     }

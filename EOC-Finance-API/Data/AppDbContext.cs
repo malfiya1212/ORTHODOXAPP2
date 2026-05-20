@@ -20,6 +20,7 @@ namespace EOC.Finance.API.Data
         public DbSet<Notification> Notifications { get; set; }
         public DbSet<Donor> Donors { get; set; }
         public DbSet<SystemLog> SystemLogs { get; set; }
+        public DbSet<LoginHistory> LoginHistory { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {

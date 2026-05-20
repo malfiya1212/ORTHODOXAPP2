@@ -5,6 +5,7 @@ using System;
 using System.Linq;
 using System.Threading.Tasks;
 using System.Collections.Generic;
+using EOC.Finance.API.Constants;
 
 namespace EOC.Finance.API.Services
 {
@@ -79,8 +80,6 @@ namespace EOC.Finance.API.Services
             {
                 var admin = await _context.Users
                     .FirstOrDefaultAsync(u => u.ChurchId == churchId && u.RoleId == 3); // 3 = CHURCH_ADMIN
-
-using EOC.Finance.API.Constants;
 
                 if (admin != null)
                 {

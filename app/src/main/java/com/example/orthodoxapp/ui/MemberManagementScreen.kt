@@ -29,6 +29,7 @@ fun MemberManagementScreen(viewModel: FinancialViewModel, onBack: () -> Unit) {
 
     val users by viewModel.users.collectAsState()
     val currentUser by viewModel.currentUser.collectAsState()
+    val incomeRecords by viewModel.income.collectAsState()
     
     val members = users.filter { it.roleId == 6L && it.churchId == currentUser?.churchId }
 
@@ -72,31 +73,69 @@ fun MemberManagementScreen(viewModel: FinancialViewModel, onBack: () -> Unit) {
     }
 
     if (selectedMemberForCert != null) {
-        var certTitle by remember { mutableStateOf("") }
-        var certType by remember { mutableStateOf("Service") }
-        var certDesc by remember { mutableStateOf("") }
+        val totalContribution = incomeRecords
+            .filter { it.createdBy == selectedMemberForCert!!.id && it.status == "APPROVED" }
+            .sumOf { it.amount }
+
+        var certTitle by remember { mutableStateOf("Certificate of Spiritual Devotion") }
+        var certType by remember { mutableStateOf("SERVICE") }
+        var certDesc by remember { mutableStateOf("In recognition of outstanding dedication, faithful attendance, and active participation in the holy services of the parish.") }
+        var isContributionCert by remember { mutableStateOf(false) }
 
         AlertDialog(
             onDismissRequest = { selectedMemberForCert = null },
             title = { Text("Issue Certificate to ${selectedMemberForCert?.name}") },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .background(OrthodoxBlue.copy(alpha = 0.05f), RoundedCornerShape(12.dp))
+                            .padding(12.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text("Contribution Award", fontWeight = FontWeight.Bold, fontSize = 14.sp, color = TextPrimary)
+                            Text("Awarded for member's tithes: ETB ${String.format("%,.0f", totalContribution)}", fontSize = 11.sp, color = TextSecondary)
+                        }
+                        Switch(
+                            checked = isContributionCert,
+                            onCheckedChange = { checked ->
+                                isContributionCert = checked
+                                if (checked) {
+                                    certTitle = "Certificate of Generous Contribution"
+                                    certType = "CONTRIBUTION"
+                                    certDesc = "Awarded in deep gratitude for generous financial contributions and tithes of ETB ${String.format("%,.2f", totalContribution)} towards the growth and spiritual mission of the parish."
+                                } else {
+                                    certTitle = "Certificate of Spiritual Devotion"
+                                    certType = "SERVICE"
+                                    certDesc = "In recognition of outstanding dedication, faithful attendance, and active participation in the holy services of the parish."
+                                }
+                            },
+                            colors = SwitchDefaults.colors(
+                                checkedThumbColor = PureLinen,
+                                checkedTrackColor = OrthodoxGold
+                            )
+                        )
+                    }
+
                     OutlinedTextField(
                         value = certTitle,
                         onValueChange = { certTitle = it },
-                        label = { Text("Award Title (e.g. Baptism Certificate)") },
+                        label = { Text("Award Title") },
                         modifier = Modifier.fillMaxWidth()
                     )
                     OutlinedTextField(
                         value = certType,
                         onValueChange = { certType = it },
-                        label = { Text("Category (Service, Baptism, etc.)") },
+                        label = { Text("Category (Service, Contribution, etc.)") },
                         modifier = Modifier.fillMaxWidth()
                     )
                     OutlinedTextField(
                         value = certDesc,
                         onValueChange = { certDesc = it },
-                        label = { Text("Description (Optional)") },
+                        label = { Text("Description") },
                         modifier = Modifier.fillMaxWidth(),
                         minLines = 2
                     )
@@ -175,7 +214,10 @@ fun MemberManagementScreen(viewModel: FinancialViewModel, onBack: () -> Unit) {
                 }
 
                 items(members.filter { it.name.contains(searchQuery, ignoreCase = true) }) { member ->
-                    MemberRow(member, onAward = { selectedMemberForCert = member })
+                    val totalContribution = incomeRecords
+                        .filter { it.createdBy == member.id && it.status == "APPROVED" }
+                        .sumOf { it.amount }
+                    MemberRow(member, totalContribution, onAward = { selectedMemberForCert = member })
                 }
             }
         }
@@ -183,7 +225,7 @@ fun MemberManagementScreen(viewModel: FinancialViewModel, onBack: () -> Unit) {
 }
 
 @Composable
-fun MemberRow(member: User, onAward: () -> Unit) {
+fun MemberRow(member: User, totalContribution: Double, onAward: () -> Unit) {
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(16.dp),
@@ -200,6 +242,19 @@ fun MemberRow(member: User, onAward: () -> Unit) {
             Column(modifier = Modifier.weight(1f)) {
                 Text(member.name, fontWeight = FontWeight.Bold, fontSize = 16.sp, color = TextPrimary)
                 Text(member.email, fontSize = 11.sp, color = TextSecondary)
+                Spacer(Modifier.height(4.dp))
+                Surface(
+                    color = OrthodoxBlue.copy(alpha = 0.05f),
+                    shape = RoundedCornerShape(6.dp)
+                ) {
+                    Text(
+                        "Total Contribution: ETB ${String.format("%,.0f", totalContribution)}",
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
+                        fontSize = 11.sp,
+                        color = OrthodoxGoldDark,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
             }
             Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 val isActive = member.status == "ACTIVE"

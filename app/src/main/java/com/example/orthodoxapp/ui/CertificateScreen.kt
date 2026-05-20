@@ -30,6 +30,7 @@ import com.example.orthodoxapp.ui.theme.*
 @Composable
 fun CertificateScreen(viewModel: FinancialViewModel, onBack: () -> Unit) {
     val certificates by viewModel.certificates.collectAsState()
+    val currentUser by viewModel.currentUser.collectAsState()
     var selectedCert by remember { mutableStateOf<Certificate?>(null) }
 
     Scaffold(
@@ -51,7 +52,7 @@ fun CertificateScreen(viewModel: FinancialViewModel, onBack: () -> Unit) {
         }
     ) { padding ->
         if (selectedCert != null) {
-            CertificateDetailDialog(selectedCert!!) { selectedCert = null }
+            CertificateDetailDialog(selectedCert!!, currentUser?.name ?: "Faithful Member") { selectedCert = null }
         }
 
         LazyColumn(
@@ -132,7 +133,7 @@ fun CertificateItem(cert: Certificate, onClick: () -> Unit) {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun CertificateDetailDialog(cert: Certificate, onDismiss: () -> Unit) {
+fun CertificateDetailDialog(cert: Certificate, userName: String, onDismiss: () -> Unit) {
     BasicAlertDialog(
         onDismissRequest = onDismiss,
         properties = androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false),
@@ -165,7 +166,7 @@ fun CertificateDetailDialog(cert: Certificate, onDismiss: () -> Unit) {
                 Spacer(Modifier.height(8.dp))
                 
                 Text(
-                    "MEMBER OF PARISH", // Ideally we'd pass the name here too
+                    userName,
                     fontWeight = FontWeight.ExtraBold,
                     fontSize = 24.sp,
                     color = TextPrimary,

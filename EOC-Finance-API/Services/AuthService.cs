@@ -4,6 +4,7 @@ using System.Text;
 using Microsoft.IdentityModel.Tokens;
 using EOC.Finance.API.Models;
 using EOC.Finance.API.Data;
+using EOC.Finance.API.DTOs;
 using Microsoft.EntityFrameworkCore;
 
 namespace EOC.Finance.API.Services
