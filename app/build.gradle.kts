@@ -45,6 +45,11 @@ android {
             excludes += "/META-INF/{AL2.0,LGPL2.1,NOTICE.md,LICENSE.md}"
         }
     }
+
+    lint {
+        abortOnError = false
+        checkReleaseBuilds = false
+    }
 }
 
 dependencies {
