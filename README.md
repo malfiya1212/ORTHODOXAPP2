@@ -33,6 +33,13 @@ As one of the world's oldest Christian institutions, the EOTC manages a vast net
 
 ---
 
+## 📦 Download Latest APK (For Students & Evaluators)
+A pre-compiled release version of the application is included in this repository. You can download and install it directly on your Android device for testing.
+- **Location:** [`releases/app-release.apk`](releases/app-release.apk)
+- **Note for students:** Please ensure you have enabled "Install from Unknown Sources" on your Android device to install and test the application.
+
+---
+
 ## 🚀 Build & Run Instructions
 
 ### Prerequisites
