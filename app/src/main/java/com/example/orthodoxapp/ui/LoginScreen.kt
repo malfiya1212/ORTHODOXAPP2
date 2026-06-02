@@ -25,6 +25,7 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import android.util.Patterns
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -87,7 +88,6 @@ fun LoginScreen(
                         .fillMaxWidth(),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    // --- Language Selector ---
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.End,
@@ -109,8 +109,6 @@ fun LoginScreen(
                     }
 
                     Spacer(modifier = Modifier.height(16.dp))
-
-                    // --- Premium Logo ---
                     Surface(
                         modifier = Modifier.size(100.dp),
                         shape = RoundedCornerShape(24.dp),
@@ -146,63 +144,72 @@ fun LoginScreen(
                         letterSpacing = 1.sp
                     )
                     
-                    Spacer(modifier = Modifier.height(32.dp))
-
-                    // --- Email Input ---
+                    Spacer(modifier = Modifier.height(24.dp))
                     OutlinedTextField(
                         value = email,
                         onValueChange = { email = it },
                         label = { Text(strings.emailLabel) },
-                        leadingIcon = { Icon(Icons.Default.Email, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
+                        leadingIcon = {
+                            Icon(
+                                imageVector = Icons.Default.Email,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary
+                            )
+                        },
                         modifier = Modifier.fillMaxWidth(),
+                        singleLine = true,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
                         shape = RoundedCornerShape(16.dp),
                         colors = OutlinedTextFieldDefaults.colors(
                             focusedBorderColor = MaterialTheme.colorScheme.primary,
-                            unfocusedBorderColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.3f),
+                            unfocusedBorderColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f),
                             focusedLabelColor = MaterialTheme.colorScheme.primary,
-                        ),
-                        enabled = loginState !is LoginState.Loading
+                            unfocusedLabelColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                        )
                     )
 
                     Spacer(modifier = Modifier.height(16.dp))
-
-                    // --- Password Input ---
                     OutlinedTextField(
                         value = password,
                         onValueChange = { password = it },
                         label = { Text(strings.passwordLabel) },
-                        leadingIcon = { Icon(Icons.Default.Lock, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
+                        leadingIcon = {
+                            Icon(
+                                imageVector = Icons.Default.Lock,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary
+                            )
+                        },
                         trailingIcon = {
+                            val icon = if (passwordVisible) Icons.Default.Visibility else Icons.Default.VisibilityOff
                             IconButton(onClick = { passwordVisible = !passwordVisible }) {
                                 Icon(
-                                    if (passwordVisible) Icons.Default.Visibility else Icons.Default.VisibilityOff,
-                                    contentDescription = null,
-                                    tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
+                                    imageVector = icon,
+                                    contentDescription = if (passwordVisible) "Hide password" else "Show password",
+                                    tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
                                 )
                             }
                         },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true,
                         visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
-                        modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(16.dp),
                         colors = OutlinedTextFieldDefaults.colors(
                             focusedBorderColor = MaterialTheme.colorScheme.primary,
-                            unfocusedBorderColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.3f),
+                            unfocusedBorderColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f),
                             focusedLabelColor = MaterialTheme.colorScheme.primary,
-                        ),
-                        enabled = loginState !is LoginState.Loading
+                            unfocusedLabelColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                        )
                     )
 
-                    Spacer(modifier = Modifier.height(32.dp))
-
-
-                    // --- Login Button ---
+                    Spacer(modifier = Modifier.height(24.dp))
                     Button(
                         onClick = { viewModel.login(email.trim(), password.trim()) },
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(58.dp),
-                        enabled = loginState !is LoginState.Loading && email.isNotBlank() && password.length >= 4,
+                        enabled = loginState !is LoginState.Loading && Patterns.EMAIL_ADDRESS.matcher(email).matches() && password.length >= 6,
                         colors = ButtonDefaults.buttonColors(
                             containerColor = MaterialTheme.colorScheme.secondary,
                             contentColor = Color.Black

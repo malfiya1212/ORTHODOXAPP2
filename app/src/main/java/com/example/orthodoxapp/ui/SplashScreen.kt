@@ -35,8 +35,8 @@ fun SplashScreen(onGetStarted: () -> Unit) {
         OnboardingData(
             "Parish Treasury", 
             "Strategic Oversight", 
-            "Monitor regional performance and diocesan\ngrowth in real-time.",
-            "https://images.unsplash.com/photo-1518709268805-4e9042af9f23?auto=format&fit=crop&q=80&w=1000"
+            "Track church funds, monitor parish donations,\nand oversee financial health securely.",
+            "https://upload.wikimedia.org/wikipedia/commons/thumb/1/14/Holy_Trinity_Cathedral%2C_Addis_Ababa.jpg/800px-Holy_Trinity_Cathedral%2C_Addis_Ababa.jpg"
         ),
         OnboardingData(
             "Community Unity", 

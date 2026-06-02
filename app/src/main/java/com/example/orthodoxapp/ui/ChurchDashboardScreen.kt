@@ -221,6 +221,10 @@ fun ChurchDashboardScreen(
             item {
                 var showAnnounceDialog by remember { mutableStateOf(false) }
                 if (showAnnounceDialog) {
+                    var announceType by remember { mutableStateOf("Announcement") }
+                    var announceTypeExpanded by remember { mutableStateOf(false) }
+                    val typeOptions = listOf("Announcement", "Event")
+                    
                     var announceTitle by remember { mutableStateOf("") }
                     var announceMessage by remember { mutableStateOf("") }
                     AlertDialog(
@@ -228,28 +232,63 @@ fun ChurchDashboardScreen(
                         title = { Text("Announce Event / Program") },
                         text = {
                             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                ExposedDropdownMenuBox(
+                                    expanded = announceTypeExpanded,
+                                    onExpandedChange = { announceTypeExpanded = !announceTypeExpanded }
+                                ) {
+                                    OutlinedTextField(
+                                        value = announceType,
+                                        onValueChange = { },
+                                        readOnly = true,
+                                        label = { Text("Type") },
+                                        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = announceTypeExpanded) },
+                                        modifier = Modifier.fillMaxWidth().menuAnchor(MenuAnchorType.PrimaryNotEditable)
+                                    )
+                                    ExposedDropdownMenu(
+                                        expanded = announceTypeExpanded,
+                                        onDismissRequest = { announceTypeExpanded = false }
+                                    ) {
+                                        typeOptions.forEach { selectionOption ->
+                                            DropdownMenuItem(
+                                                text = { Text(selectionOption) },
+                                                onClick = {
+                                                    announceType = selectionOption
+                                                    announceTypeExpanded = false
+                                                }
+                                            )
+                                        }
+                                    }
+                                }
                                 OutlinedTextField(
                                     value = announceTitle,
                                     onValueChange = { announceTitle = it },
-                                    label = { Text("Event Title") },
-                                    modifier = Modifier.fillMaxWidth()
+                                    label = { Text(if (announceType == "Event") "Event Title" else "Announcement Title") },
+                                    modifier = Modifier.fillMaxWidth(),
+                                    isError = announceTitle.isBlank(),
+                                    supportingText = if (announceTitle.isBlank()) { { Text("Title cannot be empty") } } else null
                                 )
                                 OutlinedTextField(
                                     value = announceMessage,
                                     onValueChange = { announceMessage = it },
-                                    label = { Text("Event Details & Information") },
+                                    label = { Text("Details & Information") },
                                     modifier = Modifier.fillMaxWidth(),
-                                    minLines = 3
+                                    minLines = 3,
+                                    isError = announceMessage.isBlank(),
+                                    supportingText = if (announceMessage.isBlank()) { { Text("Message cannot be empty") } } else null
                                 )
                             }
                         },
                         confirmButton = {
-                            Button(onClick = {
-                                if (announceTitle.isNotEmpty()) {
-                                    viewModel.pushAnnouncement(announceTitle, announceMessage)
-                                    showAnnounceDialog = false
-                                }
-                            }) {
+                            Button(
+                                onClick = {
+                                    if (announceTitle.isNotBlank() && announceMessage.isNotBlank()) {
+                                        val fullTitle = "[$announceType] $announceTitle"
+                                        viewModel.pushAnnouncement(fullTitle, announceMessage)
+                                        showAnnounceDialog = false
+                                    }
+                                },
+                                enabled = announceTitle.isNotBlank() && announceMessage.isNotBlank()
+                            ) {
                                 Text("Push to Members")
                             }
                         },

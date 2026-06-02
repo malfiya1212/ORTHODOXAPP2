@@ -309,9 +309,8 @@ fun DashboardScreen(viewModel: FinancialViewModel, onNavigate: (String) -> Unit 
                             ServiceButton("Groups", Icons.Default.Groups, Modifier.weight(1f)) { onNavigate("chure") }
                         }
                         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                            ServiceButton("Events", Icons.Default.Event, Modifier.weight(1f)) { onNavigate("notifications") }
-                            ServiceButton("Programs", Icons.Default.CalendarMonth, Modifier.weight(1f)) { onNavigate("notifications") }
-                            ServiceButton("Announce", Icons.Default.Campaign, Modifier.weight(1f)) { onNavigate("notifications") }
+                            ServiceButton("Events", Icons.Default.Event, Modifier.weight(1f)) { onNavigate(Screen.Notifications.createRoute("Event")) }
+                            ServiceButton("Announce", Icons.Default.Campaign, Modifier.weight(1f)) { onNavigate(Screen.Notifications.createRoute("Announcement")) }
                         }
                     }
                 }

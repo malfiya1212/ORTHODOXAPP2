@@ -36,7 +36,9 @@ sealed class Screen(val route: String) {
     object OrgManagement : Screen("org_management")
     object Settings : Screen("settings")
     object Profile : Screen("profile")
-    object Notifications : Screen("notifications")
+    object Notifications : Screen("notifications?filter={filter}") {
+        fun createRoute(filter: String = "") = if (filter.isNotEmpty()) "notifications?filter=$filter" else "notifications"
+    }
     object Chure : Screen("chure")
     object Hierarchy : Screen("hierarchy")
     object NationalMap : Screen("national_map")
@@ -190,8 +192,12 @@ fun NavGraph(
                 onEditClick = { type, id -> navController.navigate(Screen.AddOrganization.createRoute(type, id)) }
             )
         }
-        composable(Screen.Notifications.route) {
-            NotificationsScreen(viewModel, onBack = { navController.popBackStack() })
+        composable(
+            route = Screen.Notifications.route,
+            arguments = listOf(navArgument("filter") { defaultValue = "" })
+        ) { backStackEntry ->
+            val filter = backStackEntry.arguments?.getString("filter") ?: ""
+            NotificationsScreen(viewModel, filter = filter, onBack = { navController.popBackStack() })
         }
         composable(Screen.Chure.route) {
             ChureScreen(viewModel, onBack = { navController.popBackStack() }, onNavigate = { navController.navigate(it) })

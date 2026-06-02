@@ -27,4 +27,10 @@
     <string name="cancel">Cancel</string>
     <string name="approve">Approve</string>
     <string name="reject">Reject</string>
+
+    <!-- Notifications -->
+    <string name="msg_expense_approved">Your expense has been approved</string>
+    <string name="msg_expense_rejected">Your expense has been rejected</string>
+    <string name="msg_low_funds_warning">Warning: Your balance is below %s Birr.</string>
+    <string name="msg_payment_received">Payment received</string>
 </resources>

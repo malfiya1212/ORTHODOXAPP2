@@ -49,7 +49,7 @@ import kotlinx.coroutines.launch
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun GlobalPaymentScreen(viewModel: FinancialViewModel, onBack: () -> Unit) {
-    val donationTypes = listOf("Tithe (አስራት)", "Building Fund (ህንጻ)", "Monthly Payment (ወርሃዊ)", "Vow (ስለት)", "St. George (ቅዱስ ጊዮርጊስ)", "St. Mary (ማርያም)", "Offering (ቁርባን)")
+    val donationTypes = listOf("Tithe (አስራት)", "Building Fund (ህንጻ)", "Monthly Payment (ወርሃዊ)", "Vow (ስለት)", "St. George (ቅዱስ ጊዮርጊስ)", "St. Mary (ማርያም)", "Offering (ቁርባን)", "Other (ሌላ)")
     var selectedDonationType by remember { mutableStateOf(donationTypes.first()) }
     
     val liveRates by viewModel.exchangeRates.collectAsState()

@@ -24,8 +24,12 @@ import androidx.compose.runtime.setValue
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun NotificationsScreen(viewModel: FinancialViewModel, onBack: () -> Unit) {
-    val notifications by viewModel.notifications.collectAsState()
+fun NotificationsScreen(viewModel: FinancialViewModel, filter: String = "", onBack: () -> Unit) {
+    val allNotifications by viewModel.notifications.collectAsState()
+    val notifications = remember(allNotifications, filter) {
+        if (filter.isEmpty()) allNotifications
+        else allNotifications.filter { it.title.startsWith("[$filter]") }
+    }
     val incomeList by viewModel.income.collectAsState()
     val churches by viewModel.churches.collectAsState()
     val users by viewModel.users.collectAsState()
